@@ -45,7 +45,7 @@ import {
   updateProfile,
 } from "../controllers/authController.js";
 import { protect } from "../middleware/authMiddleware.js";
-import { FRONTEND_URL } from "../config/env.js";
+// import { FRONTEND_URL } from "../config/env.js";
 
 const router = express.Router();
 
@@ -76,7 +76,8 @@ router.get(
     const { token } = req.user;
 
     // Dynamic redirect (works local + production)
-    res.redirect(`${FRONTEND_URL}/google-success?token=${token}`);
+
+    res.redirect(`${process.env.FRONTEND_URL}/google-success?token=${token}`);
   },
 );
 
