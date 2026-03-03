@@ -9,35 +9,59 @@ const generateToken = (id) => {
 };
 
 export const register = async (req, res) => {
-  const { name, email, password } = req.body;
+  try {
+    const { name, email, password } = req.body;
 
-  const hashed = await bcrypt.hash(password, 10);
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "All fields required" });
+    }
 
-  const user = await User.create({
-    name,
-    email,
-    password: hashed,
-  });
+    const existingUser = await User.findOne({ email });
 
-  res.json({
-    user,
-    token: generateToken(user._id),
-  });
+    if (existingUser) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    const hashed = await bcrypt.hash(password, 10);
+
+    const user = await User.create({
+      name,
+      email,
+      password: hashed,
+    });
+
+    res.status(201).json({
+      user,
+      token: generateToken(user._id),
+    });
+  } catch (error) {
+    console.error("Register Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
 export const login = async (req, res) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-  const user = await User.findOne({ email });
+    const user = await User.findOne({ email });
 
-  if (!user) return res.status(400).json({ message: "Invalid email" });
+    if (!user) {
+      return res.status(400).json({ message: "Invalid email" });
+    }
 
-  const match = await bcrypt.compare(password, user.password);
+    const match = await bcrypt.compare(password, user.password);
 
-  if (!match) return res.status(400).json({ message: "Invalid password" });
+    if (!match) {
+      return res.status(400).json({ message: "Invalid password" });
+    }
 
-  res.json({
-    user,
-    token: generateToken(user._id),
-  });
+    res.json({
+      user,
+      token: generateToken(user._id),
+    });
+  } catch (error) {
+    console.error("Login Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
