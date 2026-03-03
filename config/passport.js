@@ -8,25 +8,37 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "http://localhost:5001/api/auth/google/callback",
+      callbackURL: `${process.env.BACKEND_URL}/api/auth/google/callback`,
+      //   callbackURL: "http://localhost:5001/api/auth/google/callback",
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
-        let user = await User.findOne({ googleId: profile.id });
+        const email = profile.emails[0].value;
+
+        let user = await User.findOne({ email });
 
         if (!user) {
           user = await User.create({
             name: profile.displayName,
-            email: profile.emails[0].value,
+            email,
             googleId: profile.id,
           });
+        } else if (!user.googleId) {
+          // Link Google account to existing user
+          user.googleId = profile.id;
+          await user.save();
         }
 
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
           expiresIn: "7d",
         });
 
-        done(null, { ...user._doc, token });
+        done(null, {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          token,
+        });
       } catch (err) {
         done(err, null);
       }
