@@ -66,29 +66,159 @@ export const login = async (req, res) => {
   }
 };
 
+// export const updateProfile = async (req, res) => {
+//   const user = await User.findById(req.user._id);
+
+//   if (!user) {
+//     return res.status(404).json({ message: "User not found" });
+//   }
+
+//   user.name = req.body.name || user.name;
+//   user.email = req.body.email || user.email;
+//   user.phone = req.body.phone || user.phone;
+//   user.address = req.body.address || user.address;
+//   user.pan = req.body.pan || user.pan;
+//   user.aadhaar = req.body.aadhaar || user.aadhaar;
+//   user.gstin = req.body.gstin || user.gstin;
+//   user.avatar = req.body.avatar || user.avatar;
+
+//   const updatedUser = await user.save();
+
+//   res.json({
+//     user: updatedUser,
+//     token: generateToken(updatedUser._id),
+//   });
+// };
+
+// export const changePassword = async (req, res) => {
+//   const { currentPassword, newPassword } = req.body;
+
+//   const user = await User.findById(req.user._id);
+
+//   const isMatch = await bcrypt.compare(currentPassword, user.password);
+
+//   if (!isMatch)
+//     return res.status(400).json({ message: "Incorrect current password" });
+
+//   user.password = await bcrypt.hash(newPassword, 10);
+//   await user.save();
+
+//   res.json({ message: "Password updated successfully" });
+// };
+
+/* ================= UPDATE PROFILE ================= */
+
+// export const updateProfile = async (req, res) => {
+//   try {
+//     const user = await User.findById(req.user._id);
+
+//     if (!user) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "User not found",
+//       });
+//     }
+
+//     // Update fields only if provided
+
+//     user.name = req.body.name ?? user.name;
+//     user.phone = req.body.phone ?? user.phone;
+//     user.address = req.body.address ?? user.address;
+//     user.pan = req.body.pan ?? user.pan;
+//     user.aadhaar = req.body.aadhaar ?? user.aadhaar;
+//     user.gstin = req.body.gstin ?? user.gstin;
+
+//     const updatedUser = await user.save();
+
+//     res.json({
+//       success: true,
+//       user: {
+//         _id: updatedUser._id,
+//         name: updatedUser.name,
+//         email: updatedUser.email,
+//         phone: updatedUser.phone,
+//         address: updatedUser.address,
+//         pan: updatedUser.pan,
+//         aadhaar: updatedUser.aadhaar,
+//         gstin: updatedUser.gstin,
+//         avatar: updatedUser.avatar,
+//         role: updatedUser.role,
+//         subscription: updatedUser.subscription,
+//         subscriptionExpiry: updatedUser.subscriptionExpiry,
+//         createdAt: updatedUser.createdAt,
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Profile update error:", error);
+
+//     res.status(500).json({
+//       success: false,
+//       message: "Server error",
+//     });
+//   }
+// };
 export const updateProfile = async (req, res) => {
   try {
-    const { name, email } = req.body;
-
     const user = await User.findById(req.user._id);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
     }
 
-    user.name = name || user.name;
-    user.email = email || user.email;
+    user.name = req.body.name ?? user.name;
+    user.phone = req.body.phone ?? user.phone;
+    user.address = req.body.address ?? user.address;
+    user.pan = req.body.pan ?? user.pan;
+    user.aadhaar = req.body.aadhaar ?? user.aadhaar;
+    user.gstin = req.body.gstin ?? user.gstin;
 
     const updatedUser = await user.save();
 
     res.json({
-      _id: updatedUser._id,
-      name: updatedUser.name,
-      email: updatedUser.email,
-      token: generateToken(updatedUser._id),
+      success: true,
+      user: updatedUser,
     });
   } catch (error) {
-    console.error("Update Profile Error:", error);
+    console.error("Profile update error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+/* ================= CHANGE PASSWORD ================= */
+
+export const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    const user = await User.findById(req.user._id).select("+password");
+
+    if (!user || !user.password) {
+      return res
+        .status(400)
+        .json({ message: "Password not set for this user" });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+
+    if (!isMatch) {
+      return res.status(400).json({ message: "Current password incorrect" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+
+    await user.save();
+
+    res.json({ message: "Password updated successfully" });
+  } catch (error) {
+    console.error("Password change error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };

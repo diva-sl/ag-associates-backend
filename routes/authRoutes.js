@@ -43,8 +43,12 @@ import {
   register,
   login,
   updateProfile,
+  changePassword,
 } from "../controllers/authController.js";
 import { protect } from "../middleware/authMiddleware.js";
+import { upload } from "../middleware/uploadMiddleware.js";
+
+import Document from "../models/Document.js";
 // import { FRONTEND_URL } from "../config/env.js";
 
 const router = express.Router();
@@ -78,6 +82,40 @@ router.get(
     // Dynamic redirect (works local + production)
 
     res.redirect(`${process.env.FRONTEND_URL}/google-success?token=${token}`);
+  },
+);
+
+// router.put("/avatar", protect, upload.single("avatar"), async (req, res) => {
+//   req.user.avatar = req.file.path;
+//   await req.user.save();
+//   res.json({ avatar: req.file.path });
+// });
+
+router.put("/avatar", protect, upload.single("avatar"), async (req, res) => {
+  req.user.avatar = req.file.path;
+
+  const updatedUser = await req.user.save();
+
+  res.json({
+    success: true,
+    user: updatedUser,
+  });
+});
+
+router.put("/change-password", protect, changePassword);
+
+router.post(
+  "/upload-document",
+  protect,
+  upload.single("file"),
+  async (req, res) => {
+    const doc = await Document.create({
+      user: req.user._id,
+      type: req.body.type,
+      fileUrl: req.file.path,
+    });
+
+    res.json(doc);
   },
 );
 
