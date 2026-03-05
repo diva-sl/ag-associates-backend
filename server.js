@@ -3,6 +3,8 @@ import express from "express";
 import cors from "cors";
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
+import transactionRoutes from "./routes/transactionRoutes.js";
+
 import passport from "./config/passport.js";
 
 connectDB();
@@ -25,6 +27,7 @@ app.use(
 app.use(passport.initialize());
 
 app.use("/api/auth", authRoutes);
+app.use("/api/transaction", transactionRoutes);
 
 app.get("/", (req, res) => {
   res.send("AG Associates API Running");

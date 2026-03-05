@@ -1,42 +1,3 @@
-// import express from "express";
-// import passport from "passport";
-// import { register, login } from "../controllers/authController.js";
-// import { protect } from "../middleware/authMiddleware.js";
-
-// const router = express.Router();
-
-// // Normal auth
-// router.post("/register", register);
-// router.post("/login", login);
-
-// router.get("/profile", protect, (req, res) => {
-//   res.json(req.user);
-// });
-
-// // Google login
-// router.get(
-//   "/google",
-//   passport.authenticate("google", { scope: ["profile", "email"] }),
-// );
-
-// // Google callback
-// router.get(
-//   "/google/callback",
-//   passport.authenticate("google", { session: false }),
-//   (req, res) => {
-//     const { token } = req.user;
-
-//     // Local
-//     res.redirect(`http://localhost:5173/google-success?token=${token}`);
-
-//     // Production (later change)
-//     // res.redirect(`https://agandassociates.org/google-success?token=${token}`);
-//   },
-// );
-
-// router.put("/profile", protect, updateProfile);
-
-// export default router;
 import express from "express";
 import passport from "passport";
 import {
@@ -45,20 +6,26 @@ import {
   updateProfile,
   changePassword,
 } from "../controllers/authController.js";
+
 import { protect } from "../middleware/authMiddleware.js";
-import { upload } from "../middleware/uploadMiddleware.js";
+
+import cloudinary from "../config/cloudinary.js";
+
+import {
+  uploadAvatar,
+  uploadDocument,
+} from "../middleware/uploadMiddleware.js";
 
 import Document from "../models/Document.js";
-// import { FRONTEND_URL } from "../config/env.js";
 
 const router = express.Router();
 
-/* ================= NORMAL AUTH ================= */
+/* AUTH */
 
 router.post("/register", register);
 router.post("/login", login);
 
-/* ================= PROFILE ================= */
+/* PROFILE */
 
 router.get("/profile", protect, (req, res) => {
   res.json(req.user);
@@ -66,7 +33,7 @@ router.get("/profile", protect, (req, res) => {
 
 router.put("/profile", protect, updateProfile);
 
-/* ================= GOOGLE AUTH ================= */
+/* GOOGLE LOGIN */
 
 router.get(
   "/google",
@@ -75,24 +42,44 @@ router.get(
 
 router.get(
   "/google/callback",
-  passport.authenticate("google", { session: false }),
+  passport.authenticate("google", {
+    session: false,
+    failureRedirect: `${process.env.FRONTEND_URL}/login`,
+  }),
   (req, res) => {
     const { token } = req.user;
 
-    // Dynamic redirect (works local + production)
-
-    res.redirect(`${process.env.FRONTEND_URL}/google-success?token=${token}`);
+    res.redirect(
+      `${process.env.FRONTEND_URL}/google-success?token=${encodeURIComponent(
+        token,
+      )}`,
+    );
   },
 );
 
-// router.put("/avatar", protect, upload.single("avatar"), async (req, res) => {
-//   req.user.avatar = req.file.path;
-//   await req.user.save();
-//   res.json({ avatar: req.file.path });
-// });
+/* AVATAR UPLOAD */
 
-router.put("/avatar", protect, upload.single("avatar"), async (req, res) => {
-  req.user.avatar = req.file.path;
+router.put(
+  "/avatar",
+  protect,
+  uploadAvatar.single("avatar"),
+  async (req, res) => {
+    req.user.avatar = req.file.path;
+
+    const updatedUser = await req.user.save();
+
+    res.json({
+      success: true,
+      avatar: req.file.path,
+      user: updatedUser,
+    });
+  },
+);
+
+/* AVATAR REMOVE */
+
+router.delete("/avatar", protect, async (req, res) => {
+  req.user.avatar = "";
 
   const updatedUser = await req.user.save();
 
@@ -102,21 +89,111 @@ router.put("/avatar", protect, upload.single("avatar"), async (req, res) => {
   });
 });
 
+/* PASSWORD */
+
 router.put("/change-password", protect, changePassword);
+
+/* DOCUMENT UPLOAD */
+
+router.get("/documents", protect, async (req, res) => {
+  const docs = await Document.find({
+    user: req.user._id,
+  }).sort({ createdAt: -1 });
+
+  res.json(docs);
+});
 
 router.post(
   "/upload-document",
   protect,
-  upload.single("file"),
+  uploadDocument.single("file"),
   async (req, res) => {
-    const doc = await Document.create({
-      user: req.user._id,
-      type: req.body.type,
-      fileUrl: req.file.path,
-    });
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
 
-    res.json(doc);
+      const doc = await Document.create({
+        user: req.user._id,
+        type: req.body.type,
+        fileUrl: req.file.path,
+        public_id: req.file.filename,
+      });
+
+      res.json({
+        success: true,
+        document: doc,
+      });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Document upload failed" });
+    }
   },
 );
+
+// router.delete("/document/:id", protect, async (req, res) => {
+//   try {
+//     const doc = await Document.findById(req.params.id);
+
+//     if (!doc) {
+//       return res.status(404).json({
+//         message: "Document not found",
+//       });
+//     }
+
+//     const isPdf = doc.fileUrl.endsWith(".pdf");
+
+//     await cloudinary.uploader.destroy(doc.public_id, {
+//       resource_type: isPdf ? "raw" : "image",
+//     });
+
+//     await doc.deleteOne();
+
+//     res.json({
+//       success: true,
+//       message: "Document deleted",
+//     });
+//   } catch (error) {
+//     console.error("Delete error:", error);
+
+//     res.status(500).json({
+//       message: "Document delete failed",
+//     });
+//   }
+// });
+router.delete("/document/:id", protect, async (req, res) => {
+  try {
+    const doc = await Document.findById(req.params.id);
+
+    if (!doc) {
+      return res.status(404).json({
+        message: "Document not found",
+      });
+    }
+
+    let resourceType = "image";
+
+    if (doc.fileUrl.includes("/raw/")) {
+      resourceType = "raw";
+    }
+
+    await cloudinary.uploader.destroy(doc.public_id, {
+      resource_type: resourceType,
+    });
+
+    await doc.deleteOne();
+
+    res.json({
+      success: true,
+      message: "Document deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete error:", error);
+
+    res.status(500).json({
+      message: "Document delete failed",
+    });
+  }
+});
 
 export default router;

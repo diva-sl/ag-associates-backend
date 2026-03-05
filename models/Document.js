@@ -6,11 +6,15 @@ const documentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
+
     type: {
       type: String,
       enum: ["ITR", "GST", "Other"],
     },
+
     fileUrl: String,
+
+    public_id: String,
   },
   { timestamps: true },
 );
