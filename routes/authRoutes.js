@@ -40,25 +40,6 @@ router.get(
   passport.authenticate("google", { scope: ["profile", "email"] }),
 );
 
-// router.get(
-//   "/google/callback",
-//   passport.authenticate("google", {
-//     session: false,
-//     failureRedirect: `${process.env.FRONTEND_URL}/login`,
-//   }),
-//   (req, res) => {
-//     const { token, user } = req.user;
-
-//     res.redirect(
-//       `${process.env.FRONTEND_URL}/google-success?token=${token}&name=${encodeURIComponent(
-//         user.name,
-//       )}&email=${encodeURIComponent(user.email)}&avatar=${encodeURIComponent(
-//         user.avatar || "",
-//       )}`,
-//     );
-//   },
-// );
-
 router.get(
   "/google/callback",
   passport.authenticate("google", {
@@ -67,14 +48,13 @@ router.get(
   }),
   (req, res) => {
     const { token, user } = req.user;
-    const redirect = req.query.redirect || "";
 
     res.redirect(
       `${process.env.FRONTEND_URL}/google-success?token=${token}&name=${encodeURIComponent(
         user.name,
       )}&email=${encodeURIComponent(user.email)}&avatar=${encodeURIComponent(
         user.avatar || "",
-      )}&redirect=${redirect}`,
+      )}`,
     );
   },
 );
