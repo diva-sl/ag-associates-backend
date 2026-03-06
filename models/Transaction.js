@@ -10,7 +10,7 @@ const transactionSchema = new mongoose.Schema(
 
     planName: {
       type: String,
-      enum: ["basic", "premium", "corporate"],
+      //   enum: ["basic", "premium", "corporate"],
       required: true,
     },
 

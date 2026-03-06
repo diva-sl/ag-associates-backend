@@ -35,10 +35,38 @@ router.put("/profile", protect, updateProfile);
 
 /* GOOGLE LOGIN */
 
-router.get(
-  "/google",
-  passport.authenticate("google", { scope: ["profile", "email"] }),
-);
+// router.get(
+//   "/google",
+//   passport.authenticate("google", { scope: ["profile", "email"] }),
+// );
+
+// router.get(
+//   "/google/callback",
+//   passport.authenticate("google", {
+//     session: false,
+//     failureRedirect: `${process.env.FRONTEND_URL}/login`,
+//   }),
+//   (req, res) => {
+//     const { token, user } = req.user;
+
+//     res.redirect(
+//       `${process.env.FRONTEND_URL}/google-success?token=${token}&name=${encodeURIComponent(
+//         user.name,
+//       )}&email=${encodeURIComponent(user.email)}&avatar=${encodeURIComponent(
+//         user.avatar || "",
+//       )}`,
+//     );
+//   },
+// );
+
+router.get("/google", (req, res, next) => {
+  const redirect = req.query.redirect || "";
+
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+    state: redirect,
+  })(req, res, next);
+});
 
 router.get(
   "/google/callback",
@@ -47,12 +75,15 @@ router.get(
     failureRedirect: `${process.env.FRONTEND_URL}/login`,
   }),
   (req, res) => {
-    const { token } = req.user;
+    const { token, user } = req.user;
+    const redirect = req.query.redirect || "";
 
     res.redirect(
-      `${process.env.FRONTEND_URL}/google-success?token=${encodeURIComponent(
-        token,
-      )}`,
+      `${process.env.FRONTEND_URL}/google-success?token=${token}&name=${encodeURIComponent(
+        user.name,
+      )}&email=${encodeURIComponent(user.email)}&avatar=${encodeURIComponent(
+        user.avatar || "",
+      )}&redirect=${redirect}`,
     );
   },
 );
@@ -168,43 +199,5 @@ router.delete("/document/:id", protect, async (req, res) => {
     });
   }
 });
-
-// router.delete("/document/:id", protect, async (req, res) => {
-//   try {
-//     const doc = await Document.findById(req.params.id);
-
-//     if (!doc) {
-//       return res.status(404).json({
-//         message: "Document not found",
-//       });
-//     }
-
-//     // let resourceType = "image";
-
-//     // if (doc.fileUrl.includes("/raw/")) {
-//     //   resourceType = "raw";
-//     // }
-
-//     // await cloudinary.uploader.destroy(doc.public_id, {
-//     //   resource_type: resourceType,
-//     // });
-//     await cloudinary.uploader.destroy(doc.public_id, {
-//       resource_type: "auto",
-//     });
-
-//     await doc.deleteOne();
-
-//     res.json({
-//       success: true,
-//       message: "Document deleted successfully",
-//     });
-//   } catch (error) {
-//     console.error("Delete error:", error);
-
-//     res.status(500).json({
-//       message: "Document delete failed",
-//     });
-//   }
-// });
 
 export default router;
