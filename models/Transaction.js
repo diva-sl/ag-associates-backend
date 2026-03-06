@@ -5,25 +5,46 @@ const transactionSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+      required: true,
     },
 
-    planName: String,
+    planName: {
+      type: String,
+      enum: ["basic", "premium", "corporate"],
+      required: true,
+    },
 
-    amount: Number,
+    amount: {
+      type: Number,
+      required: true,
+    },
 
-    razorpay_order_id: String,
+    razorpay_order_id: {
+      type: String,
+      required: true,
+    },
 
-    razorpay_payment_id: String,
+    razorpay_payment_id: {
+      type: String,
+    },
 
-    razorpay_signature: String,
+    razorpay_signature: {
+      type: String,
+    },
 
     status: {
       type: String,
       enum: ["created", "paid", "failed"],
       default: "created",
     },
+
+    expiresAt: {
+      type: Date,
+    },
   },
   { timestamps: true },
 );
 
-export default mongoose.model("Transaction", transactionSchema);
+const Transaction = mongoose.model("Transaction", transactionSchema);
+
+export default Transaction;
