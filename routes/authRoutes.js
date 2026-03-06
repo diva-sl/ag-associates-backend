@@ -141,18 +141,17 @@ router.delete("/document/:id", protect, async (req, res) => {
       });
     }
 
-    // let resourceType = "image";
+    console.log("Deleting:", doc.public_id);
 
-    // if (doc.fileUrl.includes("/raw/")) {
-    //   resourceType = "raw";
-    // }
-
-    // await cloudinary.uploader.destroy(doc.public_id, {
-    //   resource_type: resourceType,
-    // });
-    await cloudinary.uploader.destroy(doc.public_id, {
-      resource_type: "auto",
-    });
+    try {
+      await cloudinary.uploader.destroy(doc.public_id, {
+        resource_type: "image",
+      });
+    } catch (err) {
+      await cloudinary.uploader.destroy(doc.public_id, {
+        resource_type: "raw",
+      });
+    }
 
     await doc.deleteOne();
 
@@ -165,8 +164,47 @@ router.delete("/document/:id", protect, async (req, res) => {
 
     res.status(500).json({
       message: "Document delete failed",
+      error: error.message,
     });
   }
 });
+
+// router.delete("/document/:id", protect, async (req, res) => {
+//   try {
+//     const doc = await Document.findById(req.params.id);
+
+//     if (!doc) {
+//       return res.status(404).json({
+//         message: "Document not found",
+//       });
+//     }
+
+//     // let resourceType = "image";
+
+//     // if (doc.fileUrl.includes("/raw/")) {
+//     //   resourceType = "raw";
+//     // }
+
+//     // await cloudinary.uploader.destroy(doc.public_id, {
+//     //   resource_type: resourceType,
+//     // });
+//     await cloudinary.uploader.destroy(doc.public_id, {
+//       resource_type: "auto",
+//     });
+
+//     await doc.deleteOne();
+
+//     res.json({
+//       success: true,
+//       message: "Document deleted successfully",
+//     });
+//   } catch (error) {
+//     console.error("Delete error:", error);
+
+//     res.status(500).json({
+//       message: "Document delete failed",
+//     });
+//   }
+// });
 
 export default router;
