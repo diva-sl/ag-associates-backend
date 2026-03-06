@@ -35,10 +35,10 @@ router.put("/profile", protect, updateProfile);
 
 /* GOOGLE LOGIN */
 
-// router.get(
-//   "/google",
-//   passport.authenticate("google", { scope: ["profile", "email"] }),
-// );
+router.get(
+  "/google",
+  passport.authenticate("google", { scope: ["profile", "email"] }),
+);
 
 // router.get(
 //   "/google/callback",
@@ -58,15 +58,6 @@ router.put("/profile", protect, updateProfile);
 //     );
 //   },
 // );
-
-router.get("/google", (req, res, next) => {
-  const redirect = req.query.redirect || "";
-
-  passport.authenticate("google", {
-    scope: ["profile", "email"],
-    state: redirect,
-  })(req, res, next);
-});
 
 router.get(
   "/google/callback",
