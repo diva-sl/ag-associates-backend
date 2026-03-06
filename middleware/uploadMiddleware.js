@@ -18,7 +18,7 @@ const documentStorage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => ({
     folder: "ag-associates/documents",
-    resource_type: "image",
+    resource_type: "auto",
     type: "upload",
     allowed_formats: ["jpg", "jpeg", "png", "webp", "pdf"],
   }),

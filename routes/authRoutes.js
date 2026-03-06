@@ -125,7 +125,7 @@ router.post(
         document: doc,
       });
     } catch (error) {
-      console.error(error);
+      console.error("Upload error:", error);
       res.status(500).json({ message: "Document upload failed" });
     }
   },
