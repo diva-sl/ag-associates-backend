@@ -35,30 +35,58 @@ router.put("/profile", protect, updateProfile);
 
 /* GOOGLE LOGIN */
 
-router.get(
-  "/google",
-  passport.authenticate("google", { scope: ["profile", "email"] }),
-);
+// router.get(
+//   "/google",
+//   passport.authenticate("google", { scope: ["profile", "email"] }),
+// );
+
+// router.get(
+//   "/google/callback",
+//   passport.authenticate("google", {
+//     session: false,
+//     failureRedirect: `${process.env.FRONTEND_URL}/login`,
+//   }),
+//   (req, res) => {
+//     const { token, user } = req.user;
+
+//     res.redirect(
+//       `${process.env.FRONTEND_URL}/google-success?token=${token}&name=${encodeURIComponent(
+//         user.name,
+//       )}&email=${encodeURIComponent(user.email)}&avatar=${encodeURIComponent(
+//         user.avatar || "",
+//       )}`,
+//     );
+//   },
+// );
+
+router.get("/google", (req, res, next) => {
+  const redirect = req.query.redirect || "";
+
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+    state: redirect,
+  })(req, res, next);
+});
 
 router.get(
   "/google/callback",
   passport.authenticate("google", {
     session: false,
-    failureRedirect: `${process.env.FRONTEND_URL}/login`,
+    failureRedirect: `${process.env.FRONTEND_URL}/auth`,
   }),
   (req, res) => {
     const { token, user } = req.user;
+    const redirect = req.query.state || "";
 
     res.redirect(
       `${process.env.FRONTEND_URL}/google-success?token=${token}&name=${encodeURIComponent(
         user.name,
       )}&email=${encodeURIComponent(user.email)}&avatar=${encodeURIComponent(
         user.avatar || "",
-      )}`,
+      )}&redirect=${redirect}`,
     );
   },
 );
-
 /* AVATAR UPLOAD */
 
 router.put(
