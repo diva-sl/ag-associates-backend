@@ -131,36 +131,6 @@ router.post(
   },
 );
 
-// router.delete("/document/:id", protect, async (req, res) => {
-//   try {
-//     const doc = await Document.findById(req.params.id);
-
-//     if (!doc) {
-//       return res.status(404).json({
-//         message: "Document not found",
-//       });
-//     }
-
-//     const isPdf = doc.fileUrl.endsWith(".pdf");
-
-//     await cloudinary.uploader.destroy(doc.public_id, {
-//       resource_type: isPdf ? "raw" : "image",
-//     });
-
-//     await doc.deleteOne();
-
-//     res.json({
-//       success: true,
-//       message: "Document deleted",
-//     });
-//   } catch (error) {
-//     console.error("Delete error:", error);
-
-//     res.status(500).json({
-//       message: "Document delete failed",
-//     });
-//   }
-// });
 router.delete("/document/:id", protect, async (req, res) => {
   try {
     const doc = await Document.findById(req.params.id);
@@ -171,14 +141,17 @@ router.delete("/document/:id", protect, async (req, res) => {
       });
     }
 
-    let resourceType = "image";
+    // let resourceType = "image";
 
-    if (doc.fileUrl.includes("/raw/")) {
-      resourceType = "raw";
-    }
+    // if (doc.fileUrl.includes("/raw/")) {
+    //   resourceType = "raw";
+    // }
 
+    // await cloudinary.uploader.destroy(doc.public_id, {
+    //   resource_type: resourceType,
+    // });
     await cloudinary.uploader.destroy(doc.public_id, {
-      resource_type: resourceType,
+      resource_type: "auto",
     });
 
     await doc.deleteOne();
