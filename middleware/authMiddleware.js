@@ -47,6 +47,10 @@ export const protect = async (req, res, next) => {
 
     next();
   } catch (error) {
-    return res.status(401).json({ message: "Not authorized" });
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ message: "Token expired" });
+    }
+
+    return res.status(401).json({ message: "Invalid token" });
   }
 };
