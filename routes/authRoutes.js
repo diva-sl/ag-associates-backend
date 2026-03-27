@@ -5,6 +5,8 @@ import {
   login,
   updateProfile,
   changePassword,
+  forgotPassword,
+  resetPassword,
 } from "../controllers/authController.js";
 
 import { protect } from "../middleware/authMiddleware.js";
@@ -119,10 +121,11 @@ router.delete("/avatar", protect, async (req, res) => {
   });
 });
 
-/* PASSWORD */
+/* ================= PASSWORD ================= */
 
 router.put("/change-password", protect, changePassword);
-
+router.post("/forgot-password", forgotPassword);
+router.put("/reset-password/:token", resetPassword);
 /* DOCUMENT UPLOAD */
 
 router.get("/documents", protect, async (req, res) => {
