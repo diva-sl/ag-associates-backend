@@ -26,6 +26,7 @@ app.use(
       "http://localhost:5174",
       "https://agandassociates.org", // your Hostinger domain
       "https://www.agandassociates.org",
+      "https://admin.agandassociates.org",
     ],
     credentials: true,
   }),
