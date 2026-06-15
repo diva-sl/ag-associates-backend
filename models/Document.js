@@ -15,7 +15,20 @@ const documentSchema = new mongoose.Schema(
     fileUrl: String,
 
     public_id: String,
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+    },
+
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+
+    reviewedAt: Date,
   },
+
   { timestamps: true },
 );
 

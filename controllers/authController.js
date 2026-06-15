@@ -238,7 +238,7 @@ import crypto from "crypto";
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: "1h",
+    expiresIn: "5h",
   });
 };
 
@@ -323,6 +323,7 @@ export const login = async (req, res) => {
         name: user.name,
         email: user.email,
         avatar: user.avatar,
+        role: user.role,
       },
       token: generateToken(user._id),
     });

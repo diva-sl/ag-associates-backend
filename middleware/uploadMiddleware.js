@@ -24,6 +24,27 @@ const documentStorage = new CloudinaryStorage({
   }),
 });
 
+/* SUCCESS STORY STORAGE */
+
+const successStoryStorage = new CloudinaryStorage({
+  cloudinary,
+
+  params: async (req, file) => ({
+    folder:
+      file.fieldname === "pdf"
+        ? "ag-associates/success-stories/pdfs"
+        : "ag-associates/success-stories/images",
+
+    resource_type: "auto",
+
+    allowed_formats: ["jpg", "jpeg", "png", "webp", "pdf"],
+  }),
+});
+
 export const uploadAvatar = multer({ storage: avatarStorage });
 
 export const uploadDocument = multer({ storage: documentStorage });
+
+export const uploadSuccessStory = multer({
+  storage: successStoryStorage,
+});

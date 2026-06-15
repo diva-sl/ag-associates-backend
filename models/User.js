@@ -218,6 +218,19 @@ const userSchema = new mongoose.Schema(
     subscriptionExpiry: {
       type: Date,
     },
+    isBlocked: {
+      type: Boolean,
+      default: false,
+    },
+
+    lastLogin: {
+      type: Date,
+    },
+
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
   },
 
   {
