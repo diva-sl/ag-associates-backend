@@ -3,6 +3,7 @@ import Transaction from "../models/Transaction.js";
 import SubscriptionPlan from "../models/SubscriptionPlan.js";
 import Document from "../models/Document.js";
 import SuccessStory from "../models/SuccessStory.js";
+import asyncHandler from "express-async-handler";
 
 export const getDashboardStats = async (req, res) => {
   try {
@@ -84,6 +85,48 @@ export const deleteUser = async (req, res) => {
   res.json({
     success: true,
   });
+};
+
+export const updateUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    user.name = req.body.name ?? user.name;
+    user.email = req.body.email ?? user.email;
+    user.phone = req.body.phone ?? user.phone;
+    user.address = req.body.address ?? user.address;
+
+    user.pan = req.body.pan ?? user.pan;
+    user.aadhaar = req.body.aadhaar ?? user.aadhaar;
+    user.gstin = req.body.gstin ?? user.gstin;
+
+    user.role = req.body.role ?? user.role;
+    user.subscription = req.body.subscription ?? user.subscription;
+
+    user.subscriptionExpiry =
+      req.body.subscriptionExpiry ?? user.subscriptionExpiry;
+
+    if (req.body.isBlocked !== undefined) {
+      user.isBlocked = req.body.isBlocked;
+    }
+
+    const updatedUser = await user.save();
+
+    res.json({
+      success: true,
+      user: updatedUser,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
+  }
 };
 
 export const approveDocument = async (req, res) => {

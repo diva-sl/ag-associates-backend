@@ -8,6 +8,8 @@ import adminRoutes from "./routes/adminRoutes.js";
 import planRoutes from "./routes/planRoutes.js";
 import successStoryRoutes from "./routes/successStoryRoutes.js";
 import storyRoutes from "./routes/storyRoutes.js";
+import settingsRoutes from "./routes/settingsRoutes.js";
+import publicLegalRoutes from "./routes/publicLegalRoutes.js";
 
 import "./jobs/subscriptionCron.js";
 
@@ -42,6 +44,9 @@ app.use("/api/plans", planRoutes);
 app.use("/api/success-stories", storyRoutes);
 
 app.use("/api/admin/success-stories", successStoryRoutes);
+app.use("/api/admin/settings", settingsRoutes);
+
+app.use("/api/legal", publicLegalRoutes);
 
 app.get("/", (req, res) => {
   res.send("AG Associates API Running");

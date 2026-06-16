@@ -34,6 +34,7 @@ import {
   getStoryDownloadsAnalytics,
   getTopPlans,
   getDocumentAnalytics,
+  updateUser,
 } from "../controllers/adminController.js";
 
 const router = express.Router();
@@ -56,6 +57,7 @@ router.get("/recent-users", getRecentUsers);
 router.patch("/users/block/:id", blockUser);
 
 router.delete("/users/:id", deleteUser);
+router.put("/users/:id", updateUser);
 
 /* ================= TRANSACTIONS ================= */
 

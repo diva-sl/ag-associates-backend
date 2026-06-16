@@ -310,6 +310,7 @@ export const getPublishedStories = async (req, res) => {
     });
   }
 };
+
 export const downloadStoryPdf = async (req, res) => {
   try {
     const story = await SuccessStory.findById(req.params.id);
@@ -325,7 +326,8 @@ export const downloadStoryPdf = async (req, res) => {
     await story.save();
 
     res.json({
-      pdfUrl: story.pdfUrl,
+      success: true,
+      downloadUrl: story.pdfUrl,
     });
   } catch (error) {
     res.status(500).json({

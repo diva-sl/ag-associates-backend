@@ -80,6 +80,9 @@ const successStorySchema = new mongoose.Schema(
     coverImagePublicId: {
       type: String,
     },
+    pdfUrl: {
+      type: String,
+    },
 
     pdfPublicId: {
       type: String,
