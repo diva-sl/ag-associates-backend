@@ -238,7 +238,7 @@ import crypto from "crypto";
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: "5h",
+    expiresIn: "1h",
   });
 };
 
