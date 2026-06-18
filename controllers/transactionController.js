@@ -4,11 +4,17 @@ import Transaction from "../models/Transaction.js";
 import PDFDocument from "pdfkit";
 
 import User from "../models/User.js";
+import SubscriptionPlan from "../models/SubscriptionPlan.js";
+
+import { sendEmail } from "../utils/sendEmail.js";
+import { subscriptionEmailTemplate } from "../utils/subscriptionEmailTemplate.js";
+
 /* CREATE ORDER */
 
 export const createOrder = async (req, res) => {
   try {
-    const { amount, planName } = req.body;
+    // const { amount, planName } = req.body;
+    const { amount, planId } = req.body;
 
     const options = {
       amount: amount * 100,
@@ -16,12 +22,20 @@ export const createOrder = async (req, res) => {
       receipt: "receipt_" + Date.now(),
     };
 
-    const order = await razorpay.orders.create(options);
+    const plan = await SubscriptionPlan.findById(planId);
 
+    if (!plan) {
+      return res.status(404).json({
+        message: "Plan not found",
+      });
+    }
+
+    const order = await razorpay.orders.create(options);
     const transaction = await Transaction.create({
       user: req.user._id,
-      planName,
-      amount,
+      planId: plan._id,
+      planName: plan.name,
+      amount: plan.price,
       razorpay_order_id: order.id,
     });
 
@@ -51,6 +65,7 @@ export const verifyPayment = async (req, res) => {
 
     if (expectedSignature !== razorpay_signature) {
       return res.status(400).json({
+        success: false,
         message: "Invalid payment signature",
       });
     }
@@ -61,45 +76,130 @@ export const verifyPayment = async (req, res) => {
 
     if (!transaction) {
       return res.status(404).json({
+        success: false,
         message: "Transaction not found",
       });
     }
 
-    /* ================= UPDATE TRANSACTION ================= */
+    // Prevent duplicate verification
+    if (transaction.status === "paid") {
+      return res.status(200).json({
+        success: true,
+        message: "Payment already verified",
+      });
+    }
+
+    const user = await User.findById(transaction.user);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const plan = await SubscriptionPlan.findById(transaction.planId);
+
+    if (!plan) {
+      return res.status(404).json({
+        success: false,
+        message: "Plan not found",
+      });
+    }
+
+    /* ================= TRANSACTION ================= */
 
     transaction.status = "paid";
     transaction.razorpay_payment_id = razorpay_payment_id;
     transaction.razorpay_signature = razorpay_signature;
 
+    transaction.paidAt = new Date();
+
+    transaction.invoiceNumber = `AGA-${Date.now()}`;
+
     await transaction.save();
 
-    /* ================= UPDATE USER SUBSCRIPTION ================= */
+    /* ================= USER SUBSCRIPTION ================= */
 
-    const user = await User.findById(transaction.user);
+    const now = new Date();
 
-    const plan = transaction.planName;
+    let expiry =
+      user.subscriptionExpiry && user.subscriptionExpiry > now
+        ? new Date(user.subscriptionExpiry)
+        : new Date(now);
 
-    let expiry = new Date();
+    expiry.setMonth(expiry.getMonth() + (plan.duration || 12));
 
-    if (plan === "basic") expiry.setMonth(expiry.getMonth() + 1);
-    if (plan === "premium") expiry.setMonth(expiry.getMonth() + 6);
-    if (plan === "corporate") expiry.setFullYear(expiry.getFullYear() + 1);
+    user.subscription = plan.name;
 
-    user.subscription = plan;
+    user.subscriptionPlan = plan._id;
+
+    user.subscriptionAmount = plan.price;
+
+    user.subscriptionPurchasedAt = new Date();
+
+    user.subscriptionStatus = "active";
+
     user.subscriptionExpiry = expiry;
 
     await user.save();
 
-    res.json({
+    /* ================= USER EMAIL ================= */
+
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: `Subscription Activated - ${plan.name}`,
+        html: subscriptionEmailTemplate({
+          name: user.name,
+          planName: plan.name,
+          amount: plan.price,
+          expiryDate: expiry,
+        }),
+      });
+    } catch (emailError) {
+      console.log("Subscription Email Error:", emailError.message);
+    }
+
+    /* ================= ADMIN EMAIL ================= */
+
+    try {
+      if (process.env.ADMIN_EMAIL) {
+        await sendEmail({
+          to: process.env.ADMIN_EMAIL,
+          subject: "New Subscription Purchase",
+          html: `
+            <h2>New Subscription Purchased</h2>
+
+            <p><strong>Name:</strong> ${user.name}</p>
+            <p><strong>Email:</strong> ${user.email}</p>
+            <p><strong>Plan:</strong> ${plan.name}</p>
+            <p><strong>Amount:</strong> ₹${plan.price}</p>
+            <p><strong>Expiry:</strong> ${expiry.toLocaleDateString()}</p>
+          `,
+        });
+      }
+    } catch (error) {
+      console.log("Admin Email Error:", error.message);
+    }
+
+    res.status(200).json({
       success: true,
-      message: "Payment verified",
-      subscription: user.subscription,
-      expiry: user.subscriptionExpiry,
+      message: "Payment verified successfully",
+
+      subscription: {
+        name: user.subscription,
+        amount: user.subscriptionAmount,
+        status: user.subscriptionStatus,
+        expiry: user.subscriptionExpiry,
+        purchasedAt: user.subscriptionPurchasedAt,
+      },
     });
   } catch (error) {
     console.log(error);
 
     res.status(500).json({
+      success: false,
       message: "Payment verification failed",
     });
   }
@@ -150,6 +250,11 @@ export const downloadInvoice = async (req, res) => {
     doc.text(`Email: ${transaction.user.email}`);
     doc.text(`Plan: ${transaction.planName}`);
     doc.text(`Amount: ₹${transaction.amount}`);
+    doc.text(`Payment Status: ${transaction.status}`);
+    doc.text(
+      `Invoice Date: ${new Date(transaction.createdAt).toLocaleDateString()}`,
+    );
+    doc.text(`Amount: ₹${transaction.amount}`);
     doc.text(`Date: ${transaction.createdAt}`);
 
     doc.end();
@@ -159,4 +264,3 @@ export const downloadInvoice = async (req, res) => {
     });
   }
 };
-

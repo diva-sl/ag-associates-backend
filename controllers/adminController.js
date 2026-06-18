@@ -4,6 +4,8 @@ import SubscriptionPlan from "../models/SubscriptionPlan.js";
 import Document from "../models/Document.js";
 import SuccessStory from "../models/SuccessStory.js";
 import asyncHandler from "express-async-handler";
+import { sendEmail } from "../utils/sendEmail.js";
+import { subscriptionEmailTemplate } from "../utils/subscriptionEmailTemplate.js";
 
 export const getDashboardStats = async (req, res) => {
   try {
@@ -93,9 +95,15 @@ export const updateUser = async (req, res) => {
 
     if (!user) {
       return res.status(404).json({
+        success: false,
         message: "User not found",
       });
     }
+
+    const oldSubscription = user.subscription;
+    const oldExpiry = user.subscriptionExpiry;
+
+    /* ================= BASIC INFO ================= */
 
     user.name = req.body.name ?? user.name;
     user.email = req.body.email ?? user.email;
@@ -107,10 +115,54 @@ export const updateUser = async (req, res) => {
     user.gstin = req.body.gstin ?? user.gstin;
 
     user.role = req.body.role ?? user.role;
-    user.subscription = req.body.subscription ?? user.subscription;
 
-    user.subscriptionExpiry =
-      req.body.subscriptionExpiry ?? user.subscriptionExpiry;
+    /* ================= SUBSCRIPTION ================= */
+
+    if (req.body.subscription !== undefined) {
+      if (req.body.subscription === "none") {
+        user.subscription = "none";
+        user.subscriptionPlan = null;
+        user.subscriptionAmount = 0;
+        user.subscriptionStatus = "cancelled";
+        user.subscriptionPurchasedAt = null;
+      } else {
+        const plan = await SubscriptionPlan.findOne({
+          name: req.body.subscription,
+        });
+
+        if (plan) {
+          user.subscription = plan.name;
+          user.subscriptionPlan = plan._id;
+          user.subscriptionAmount = plan.price;
+
+          user.subscriptionPurchasedAt =
+            req.body.subscriptionPurchasedAt ||
+            user.subscriptionPurchasedAt ||
+            new Date();
+
+          user.subscriptionStatus = req.body.subscriptionStatus || "active";
+        }
+      }
+    }
+
+    if (req.body.subscriptionExpiry) {
+      user.subscriptionExpiry = req.body.subscriptionExpiry;
+    }
+
+    if (req.body.subscriptionStatus) {
+      user.subscriptionStatus = req.body.subscriptionStatus;
+    }
+
+    /* ================= AUTO EXPIRE ================= */
+
+    if (
+      user.subscriptionExpiry &&
+      new Date(user.subscriptionExpiry) < new Date()
+    ) {
+      user.subscriptionStatus = "expired";
+    }
+
+    /* ================= BLOCK USER ================= */
 
     if (req.body.isBlocked !== undefined) {
       user.isBlocked = req.body.isBlocked;
@@ -118,12 +170,48 @@ export const updateUser = async (req, res) => {
 
     const updatedUser = await user.save();
 
-    res.json({
+    /* ================= SEND EMAIL ================= */
+
+    const subscriptionChanged =
+      oldSubscription !== updatedUser.subscription ||
+      String(oldExpiry) !== String(updatedUser.subscriptionExpiry);
+
+    if (
+      subscriptionChanged &&
+      updatedUser.subscription &&
+      updatedUser.subscription !== "none"
+    ) {
+      try {
+        await sendEmail({
+          to: updatedUser.email,
+          subject: `Subscription Updated - ${updatedUser.subscription}`,
+          html: subscriptionEmailTemplate({
+            name: updatedUser.name,
+            planName: updatedUser.subscription,
+            amount: updatedUser.subscriptionAmount,
+            expiryDate: updatedUser.subscriptionExpiry,
+          }),
+        });
+      } catch (emailError) {
+        console.log("Email Error:", emailError.message);
+      }
+    }
+
+    const populatedUser = await User.findById(updatedUser._id).populate(
+      "subscriptionPlan",
+      "name price originalPrice category duration",
+    );
+
+    res.status(200).json({
       success: true,
-      user: updatedUser,
+      message: "User updated successfully",
+      user: populatedUser,
     });
   } catch (error) {
+    console.log(error);
+
     res.status(500).json({
+      success: false,
       message: error.message,
     });
   }

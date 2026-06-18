@@ -211,8 +211,26 @@ const userSchema = new mongoose.Schema(
 
     subscription: {
       type: String,
-      enum: ["none", "basic", "premium", "corporate"],
       default: "none",
+    },
+    subscriptionPlan: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SubscriptionPlan",
+    },
+
+    subscriptionAmount: {
+      type: Number,
+      default: 0,
+    },
+
+    subscriptionPurchasedAt: {
+      type: Date,
+    },
+
+    subscriptionStatus: {
+      type: String,
+      enum: ["active", "expired", "cancelled"],
+      default: "active",
     },
 
     subscriptionExpiry: {

@@ -37,6 +37,12 @@ const subscriptionPlanSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
+    duration: {
+      type: Number,
+      required: true,
+      default: 1,
+    },
   },
   {
     timestamps: true,

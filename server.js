@@ -10,6 +10,8 @@ import successStoryRoutes from "./routes/successStoryRoutes.js";
 import storyRoutes from "./routes/storyRoutes.js";
 import settingsRoutes from "./routes/settingsRoutes.js";
 import publicLegalRoutes from "./routes/publicLegalRoutes.js";
+import knowledgeRoutes from "./routes/knowledgeRoutes.js";
+import newsletterRoutes from "./routes/newsletterRoutes.js";
 
 import "./jobs/subscriptionCron.js";
 
@@ -20,6 +22,7 @@ connectDB();
 const app = express();
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 app.use(
   cors({
@@ -51,6 +54,9 @@ app.use("/api/legal", publicLegalRoutes);
 app.get("/", (req, res) => {
   res.send("AG Associates API Running");
 });
+
+app.use("/api/knowledge", knowledgeRoutes);
+app.use("/api/newsletter", newsletterRoutes);
 
 const PORT = process.env.PORT || 5001;
 

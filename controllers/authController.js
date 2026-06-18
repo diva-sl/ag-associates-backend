@@ -1,234 +1,3 @@
-// import User from "../models/User.js";
-// import bcrypt from "bcryptjs";
-// import jwt from "jsonwebtoken";
-
-// const generateToken = (id) => {
-//   return jwt.sign({ id }, process.env.JWT_SECRET, {
-//     expiresIn: "1h",
-//   });
-// };
-
-// export const register = async (req, res) => {
-//   try {
-//     const { name, email, password } = req.body;
-
-//     if (!name || !email || !password) {
-//       return res.status(400).json({ message: "All fields required" });
-//     }
-
-//     const existingUser = await User.findOne({ email });
-
-//     if (existingUser) {
-//       return res.status(400).json({ message: "User already exists" });
-//     }
-
-//     const hashed = await bcrypt.hash(password, 10);
-
-//     const user = await User.create({
-//       name,
-//       email,
-//       password: hashed,
-//     });
-
-//     res.status(201).json({
-//       user,
-//       token: generateToken(user._id),
-//     });
-//   } catch (error) {
-//     console.error("Register Error:", error);
-//     res.status(500).json({ message: "Server error" });
-//   }
-// };
-
-// // export const login = async (req, res) => {
-// //   try {
-// //     const { email, password } = req.body;
-
-// //     const user = await User.findOne({ email });
-
-// //     if (!user) {
-// //       return res.status(400).json({ message: "Invalid email" });
-// //     }
-
-// //     const match = await bcrypt.compare(password, user.password);
-
-// //     if (!match) {
-// //       return res.status(400).json({ message: "Invalid password" });
-// //     }
-
-// //     res.json({
-// //       user,
-// //       token: generateToken(user._id),
-// //     });
-// //   } catch (error) {
-// //     console.error("Login Error:", error);
-// //     res.status(500).json({ message: "Server error" });
-// //   }
-// // };
-// export const login = async (req, res) => {
-//   try {
-//     const { email, password } = req.body;
-
-//     const user = await User.findOne({ email }).select("+password");
-
-//     if (!user) {
-//       return res.status(400).json({ message: "Invalid email" });
-//     }
-
-//     // 🔥 GOOGLE USER WITHOUT PASSWORD
-//     if (!user.password) {
-//       return res.status(400).json({
-//         message: "This account uses Google login. Please continue with Google.",
-//       });
-//     }
-
-//     const match = await bcrypt.compare(password, user.password);
-
-//     if (!match) {
-//       return res.status(400).json({ message: "Invalid password" });
-//     }
-
-//     res.json({
-//       user,
-//       token: generateToken(user._id),
-//     });
-//   } catch (error) {
-//     console.error("Login Error:", error);
-//     res.status(500).json({ message: "Server error" });
-//   }
-// };
-
-// export const updateProfile = async (req, res) => {
-//   try {
-//     const user = await User.findById(req.user._id);
-
-//     if (!user) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "User not found",
-//       });
-//     }
-
-//     user.name = req.body.name ?? user.name;
-//     user.phone = req.body.phone ?? user.phone;
-//     user.address = req.body.address ?? user.address;
-//     user.pan = req.body.pan ?? user.pan;
-//     user.aadhaar = req.body.aadhaar ?? user.aadhaar;
-//     user.gstin = req.body.gstin ?? user.gstin;
-
-//     const updatedUser = await user.save();
-
-//     res.json({
-//       success: true,
-//       user: updatedUser,
-//     });
-//   } catch (error) {
-//     console.error("Profile update error:", error);
-
-//     res.status(500).json({
-//       success: false,
-//       message: "Server error",
-//     });
-//   }
-// };
-
-// /* ================= CHANGE PASSWORD ================= */
-
-// // export const changePassword = async (req, res) => {
-// //   try {
-// //     const { currentPassword, newPassword } = req.body;
-
-// //     const user = await User.findById(req.user._id).select("+password");
-
-// //     if (!user || !user.password) {
-// //       return res
-// //         .status(400)
-// //         .json({ message: "Password not set for this user" });
-// //     }
-
-// //     const isMatch = await bcrypt.compare(currentPassword, user.password);
-
-// //     if (!isMatch) {
-// //       return res.status(400).json({ message: "Current password incorrect" });
-// //     }
-
-// //     const salt = await bcrypt.genSalt(10);
-// //     user.password = await bcrypt.hash(newPassword, salt);
-
-// //     await user.save();
-
-// //     res.json({ message: "Password updated successfully" });
-// //   } catch (error) {
-// //     console.error("Password change error:", error);
-// //     res.status(500).json({ message: "Server error" });
-// //   }
-// // };
-// export const changePassword = async (req, res) => {
-//   try {
-//     const { currentPassword, newPassword, confirmPassword } = req.body;
-
-//     // 🔥 1. Validate input
-//     if (!newPassword || !confirmPassword) {
-//       return res.status(400).json({ message: "All fields required" });
-//     }
-
-//     if (newPassword !== confirmPassword) {
-//       return res.status(400).json({ message: "Passwords do not match" });
-//     }
-
-//     if (newPassword.length < 6) {
-//       return res
-//         .status(400)
-//         .json({ message: "Password must be at least 6 characters" });
-//     }
-
-//     const user = await User.findById(req.user._id).select("+password");
-
-//     if (!user) {
-//       return res.status(404).json({ message: "User not found" });
-//     }
-
-//     /* ================= GOOGLE USER FIRST TIME ================= */
-
-//     if (!user.password) {
-//       // 🔥 Google user setting password first time
-//       const salt = await bcrypt.genSalt(10);
-//       user.password = await bcrypt.hash(newPassword, salt);
-
-//       await user.save();
-
-//       return res.json({
-//         success: true,
-//         message: "Password set successfully",
-//       });
-//     }
-
-//     /* ================= NORMAL USER ================= */
-
-//     if (!currentPassword) {
-//       return res.status(400).json({ message: "Current password is required" });
-//     }
-
-//     const isMatch = await bcrypt.compare(currentPassword, user.password);
-
-//     if (!isMatch) {
-//       return res.status(400).json({ message: "Current password incorrect" });
-//     }
-
-//     const salt = await bcrypt.genSalt(10);
-//     user.password = await bcrypt.hash(newPassword, salt);
-
-//     await user.save();
-
-//     res.json({
-//       success: true,
-//       message: "Password updated successfully",
-//     });
-//   } catch (error) {
-//     console.error("Password change error:", error);
-//     res.status(500).json({ message: "Server error" });
-//   }
-// };
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -324,6 +93,10 @@ export const login = async (req, res) => {
         email: user.email,
         avatar: user.avatar,
         role: user.role,
+
+        subscription: user.subscription,
+        subscriptionStatus: user.subscriptionStatus,
+        subscriptionExpiry: user.subscriptionExpiry,
       },
       token: generateToken(user._id),
     });
@@ -363,56 +136,6 @@ export const updateProfile = async (req, res) => {
   }
 };
 
-/* ================= CHANGE PASSWORD ================= */
-
-// export const changePassword = async (req, res) => {
-//   try {
-//     const { currentPassword, newPassword, confirmPassword } = req.body;
-
-//     if (!newPassword || !confirmPassword) {
-//       return res.status(400).json({ message: "All fields required" });
-//     }
-
-//     if (newPassword !== confirmPassword) {
-//       return res.status(400).json({ message: "Passwords do not match" });
-//     }
-
-//     const user = await User.findById(req.user._id).select("+password");
-
-//     if (!user) {
-//       return res.status(404).json({ message: "User not found" });
-//     }
-
-//     // 🔥 Google user first time
-//     if (!user.password) {
-//       const salt = await bcrypt.genSalt(10);
-//       user.password = await bcrypt.hash(newPassword, salt);
-
-//       await user.save();
-
-//       return res.json({ message: "Password set successfully" });
-//     }
-
-//     if (!currentPassword) {
-//       return res.status(400).json({ message: "Current password required" });
-//     }
-
-//     const isMatch = await bcrypt.compare(currentPassword, user.password);
-
-//     if (!isMatch) {
-//       return res.status(400).json({ message: "Incorrect current password" });
-//     }
-
-//     const salt = await bcrypt.genSalt(10);
-//     user.password = await bcrypt.hash(newPassword, salt);
-
-//     await user.save();
-
-//     res.json({ message: "Password updated successfully" });
-//   } catch (error) {
-//     res.status(500).json({ message: "Server error" });
-//   }
-// };
 export const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword, confirmPassword } = req.body;
@@ -531,4 +254,30 @@ export const resetPassword = async (req, res) => {
   await user.save();
 
   res.json({ message: "Password reset successful" });
+};
+
+export const getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).populate(
+      "subscriptionPlan",
+      "name price originalPrice category duration",
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    const hasPassword = !!user.password;
+
+    res.json({
+      ...user.toObject(),
+      hasPassword,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
+  }
 };

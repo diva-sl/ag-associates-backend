@@ -13,6 +13,10 @@ const transactionSchema = new mongoose.Schema(
       //   enum: ["basic", "premium", "corporate"],
       required: true,
     },
+    planId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SubscriptionPlan",
+    },
 
     amount: {
       type: Number,
@@ -36,6 +40,13 @@ const transactionSchema = new mongoose.Schema(
       type: String,
       enum: ["created", "paid", "failed"],
       default: "created",
+    },
+    invoiceNumber: {
+      type: String,
+    },
+
+    paidAt: {
+      type: Date,
     },
 
     expiresAt: {

@@ -41,10 +41,26 @@ const successStoryStorage = new CloudinaryStorage({
   }),
 });
 
+const knowledgeStorage = new CloudinaryStorage({
+  cloudinary,
+
+  params: async () => ({
+    folder: "ag-associates/knowledge-center",
+
+    resource_type: "image",
+
+    allowed_formats: ["jpg", "jpeg", "png", "webp"],
+  }),
+});
+
 export const uploadAvatar = multer({ storage: avatarStorage });
 
 export const uploadDocument = multer({ storage: documentStorage });
 
 export const uploadSuccessStory = multer({
   storage: successStoryStorage,
+});
+
+export const uploadKnowledgePost = multer({
+  storage: knowledgeStorage,
 });
