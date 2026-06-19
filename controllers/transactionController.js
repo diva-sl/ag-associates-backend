@@ -147,6 +147,12 @@ export const verifyPayment = async (req, res) => {
     /* ================= USER EMAIL ================= */
 
     try {
+      console.log({
+        SMTP_HOST: process.env.SMTP_HOST,
+        SMTP_PORT: process.env.SMTP_PORT,
+        SMTP_EMAIL: process.env.SMTP_EMAIL,
+        SMTP_PASSWORD: process.env.SMTP_PASSWORD ? "FOUND" : "MISSING",
+      });
       await sendEmail({
         to: user.email,
         subject: `Subscription Activated - ${plan.name}`,
