@@ -14,8 +14,8 @@ import { subscriptionEmailTemplate } from "../utils/subscriptionEmailTemplate.js
 export const createOrder = async (req, res) => {
   try {
     // const { amount, planName } = req.body;
-    // const { amount, planId } = req.body;
-    const { planId } = req.body;
+    const { amount, planId } = req.body;
+    // const { planId } = req.body;
 
     const plan = await SubscriptionPlan.findById(planId);
 
