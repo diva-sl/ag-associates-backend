@@ -11,42 +11,87 @@ import { subscriptionEmailTemplate } from "../utils/subscriptionEmailTemplate.js
 
 /* CREATE ORDER */
 
+// export const createOrder = async (req, res) => {
+//   try {
+//     // const { amount, planName } = req.body;
+//     const { amount, planId } = req.body;
+//     // const { planId } = req.body;
+
+//     const plan = await SubscriptionPlan.findById(planId);
+
+//     const options = {
+//       amount: amount * 100,
+//       currency: "INR",
+//       receipt: "receipt_" + Date.now(),
+//     };
+
+//     if (!plan) {
+//       return res.status(404).json({
+//         message: "Plan not found",
+//       });
+//     }
+
+//     const order = await razorpay.orders.create(options);
+//     const transaction = await Transaction.create({
+//       user: req.user._id,
+//       planId: plan._id,
+//       planName: plan.name,
+//       amount: plan.price,
+//       razorpay_order_id: order.id,
+//     });
+
+//     res.json({
+//       order,
+//       transaction,
+//     });
+//   } catch (error) {
+//     console.log(error);
+//     res.status(500).json({ message: "Order creation failed" });
+//   }
+// };
+
 export const createOrder = async (req, res) => {
   try {
-    // const { amount, planName } = req.body;
-    const { amount, planId } = req.body;
-    // const { planId } = req.body;
+    const { planId } = req.body;
 
     const plan = await SubscriptionPlan.findById(planId);
 
-    const options = {
-      amount: amount * 100,
-      currency: "INR",
-      receipt: "receipt_" + Date.now(),
-    };
-
     if (!plan) {
       return res.status(404).json({
+        success: false,
         message: "Plan not found",
       });
     }
 
+    const options = {
+      amount: Number(plan.price) * 100,
+      currency: "INR",
+      receipt: `receipt_${Date.now()}`,
+    };
+
     const order = await razorpay.orders.create(options);
+
     const transaction = await Transaction.create({
       user: req.user._id,
       planId: plan._id,
       planName: plan.name,
       amount: plan.price,
       razorpay_order_id: order.id,
+      status: "created",
     });
 
-    res.json({
+    return res.status(200).json({
+      success: true,
       order,
       transaction,
     });
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Order creation failed" });
+    console.error("Create Order Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Order creation failed",
+    });
   }
 };
 

@@ -244,7 +244,17 @@ const userSchema = new mongoose.Schema(
     lastLogin: {
       type: Date,
     },
+    lastLoginIP: {
+      type: String,
+    },
 
+    lastDevice: {
+      type: String,
+    },
+
+    passwordChangedAt: {
+      type: Date,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
