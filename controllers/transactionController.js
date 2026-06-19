@@ -25,8 +25,6 @@ export const createOrder = async (req, res) => {
       receipt: "receipt_" + Date.now(),
     };
 
-    const plan = await SubscriptionPlan.findById(planId);
-
     if (!plan) {
       return res.status(404).json({
         message: "Plan not found",
