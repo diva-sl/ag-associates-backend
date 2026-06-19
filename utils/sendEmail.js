@@ -25,10 +25,20 @@ transporter.verify((error) => {
 });
 
 export const sendEmail = async ({ to, subject, html }) => {
-  return transporter.sendMail({
-    from: `"AG & ASSOCIATES" <${process.env.SMTP_EMAIL}>`,
-    to,
-    subject,
-    html,
-  });
+  try {
+    const info = await transporter.sendMail({
+      from: `"AG & ASSOCIATES" <${process.env.SMTP_EMAIL}>`,
+      to,
+      subject,
+      html,
+    });
+
+    console.log("EMAIL SENT:", info.messageId);
+
+    return info;
+  } catch (error) {
+    console.error("EMAIL ERROR:", error);
+
+    throw error;
+  }
 };
