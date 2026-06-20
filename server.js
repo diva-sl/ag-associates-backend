@@ -29,13 +29,17 @@ app.use(
     origin: [
       "http://localhost:5173",
       "http://localhost:5174",
-      "https://agandassociates.org", // your Hostinger domain
+      "https://agandassociates.org",
       "https://www.agandassociates.org",
       "https://admin.agandassociates.org",
     ],
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
+
+// app.options("*", cors());
 
 app.use(passport.initialize());
 
