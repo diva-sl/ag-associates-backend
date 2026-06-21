@@ -44,21 +44,10 @@ router.put("/categories/:id", protect, adminOnly, updateCategory);
 router.delete("/categories/:id", protect, adminOnly, deleteCategory);
 
 /* Posts */
+router.post("/", protect, adminOnly, uploadKnowledgePost, createPost);
 
-router.post(
-  "/",
-  protect,
-  adminOnly,
-  uploadKnowledgePost.single("featuredImage"),
-  createPost,
-);
-router.put(
-  "/:id",
-  protect,
-  adminOnly,
-  uploadKnowledgePost.single("featuredImage"),
-  updatePost,
-);
+router.put("/:id", protect, adminOnly, uploadKnowledgePost, updatePost);
+
 router.get("/", getPosts);
 
 router.get("/featured", getFeaturedPosts);
@@ -72,8 +61,6 @@ router.get("/analytics/top-articles", protect, adminOnly, getTopArticles);
 router.get("/analytics/categories", protect, adminOnly, getCategoryStats);
 
 router.get("/edit/:id", protect, adminOnly, getPostById);
-
-router.get("/:slug", getPostBySlug);
 
 router.delete("/:id", protect, adminOnly, deletePost);
 
@@ -98,5 +85,7 @@ router.patch("/questions/:id/approve", protect, adminOnly, approveQuestion);
 router.patch("/questions/:id/answer", protect, adminOnly, answerQuestion);
 
 router.delete("/questions/:id", protect, adminOnly, deleteQuestion);
+
+router.get("/:slug", getPostBySlug);
 
 export default router;

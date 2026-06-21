@@ -45,6 +45,10 @@ const transactionSchema = new mongoose.Schema(
       type: String,
     },
 
+    invoiceKey: {
+      type: String,
+    },
+
     paidAt: {
       type: Date,
     },

@@ -43,12 +43,14 @@ export const register = async (req, res) => {
       email,
       password: hashed,
     });
-
     res.status(201).json({
+      success: true,
       user: {
         _id: user._id,
         name: user.name,
         email: user.email,
+        avatar: user.avatar,
+        role: user.role,
       },
       token: generateToken(user._id),
     });
@@ -102,6 +104,7 @@ export const login = async (req, res) => {
         email: user.email,
         avatar: user.avatar,
         role: user.role,
+        avatarKey: user.avatarKey,
 
         subscription: user.subscription,
         subscriptionStatus: user.subscriptionStatus,
@@ -129,9 +132,10 @@ export const updateProfile = async (req, res) => {
     if (req.body.name !== undefined) user.name = req.body.name;
     if (req.body.phone !== undefined) user.phone = req.body.phone;
     if (req.body.address !== undefined) user.address = req.body.address;
-    if (req.body.pan !== undefined) user.pan = req.body.pan.toUpperCase();
+    if (req.body.pan !== undefined) user.pan = req.body.pan.toUpperCase() || "";
     if (req.body.aadhaar !== undefined) user.aadhaar = req.body.aadhaar;
-    if (req.body.gstin !== undefined) user.gstin = req.body.gstin.toUpperCase();
+    if (req.body.gstin !== undefined)
+      user.gstin = req.body.gstin.toUpperCase() || "";
 
     const updatedUser = await user.save();
 
@@ -208,35 +212,6 @@ export const changePassword = async (req, res) => {
   }
 };
 
-/* ================= FORGOT PASSWORD ================= */
-
-// export const forgotPassword = async (req, res) => {
-//   const { email } = req.body;
-
-//   const user = await User.findOne({ email });
-
-//   if (!user) {
-//     return res.status(404).json({ message: "User not found" });
-//   }
-
-//   const resetToken = crypto.randomBytes(32).toString("hex");
-
-//   user.resetPasswordToken = crypto
-//     .createHash("sha256")
-//     .update(resetToken)
-//     .digest("hex");
-
-//   user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
-
-//   await user.save();
-
-//   const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
-
-//   console.log("RESET LINK:", resetUrl);
-
-//   res.json({ message: "Reset link sent (check console)" });
-// };
-
 export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -260,7 +235,10 @@ export const forgotPassword = async (req, res) => {
 
     user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
 
-    await user.save();
+    // await user.save();
+    await user.save({
+      validateBeforeSave: false,
+    });
 
     const resetUrl =
       `${process.env.FRONTEND_URL}` + `/reset-password/${resetToken}`;
@@ -328,6 +306,13 @@ export const forgotPassword = async (req, res) => {
 /* ================= RESET PASSWORD ================= */
 
 export const resetPassword = async (req, res) => {
+  const { password } = req.body;
+
+  if (!password || password.length < 6) {
+    return res.status(400).json({
+      message: "Password must be at least 6 characters",
+    });
+  }
   const hashedToken = crypto
     .createHash("sha256")
     .update(req.params.token)
@@ -366,8 +351,13 @@ export const getProfile = async (req, res) => {
         message: "User not found",
       });
     }
+    const userWithPassword = await User.findById(req.user._id).select(
+      "+password",
+    );
 
-    const hasPassword = !!user.password;
+    const hasPassword = !!userWithPassword.password;
+
+    // const hasPassword = !!user.password;
 
     res.json({
       ...user.toObject(),

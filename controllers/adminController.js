@@ -6,12 +6,16 @@ import SuccessStory from "../models/SuccessStory.js";
 import asyncHandler from "express-async-handler";
 import { sendEmail } from "../utils/sendEmail.js";
 import { subscriptionEmailTemplate } from "../utils/subscriptionEmailTemplate.js";
+import { getSignedFileUrl, deleteFromS3 } from "../utils/uploadToS3.js";
 
 export const getDashboardStats = async (req, res) => {
   try {
     const [users, transactions, documents] = await Promise.all([
       User.countDocuments(),
-      Transaction.countDocuments(),
+      // Transaction.countDocuments(),
+      Transaction.countDocuments({
+        status: "paid",
+      }),
       Document.countDocuments(),
     ]);
 
@@ -81,12 +85,55 @@ export const blockUser = async (req, res) => {
   });
 };
 
-export const deleteUser = async (req, res) => {
-  await User.findByIdAndDelete(req.params.id);
+// export const deleteUser = async (req, res) => {
+//   await User.findByIdAndDelete(req.params.id);
 
-  res.json({
-    success: true,
-  });
+//   res.json({
+//     success: true,
+//   });
+// };
+export const deleteUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    if (user.avatarKey) {
+      await deleteFromS3(user.avatarKey);
+    }
+
+    const documents = await Document.find({
+      user: user._id,
+    });
+
+    for (const doc of documents) {
+      if (doc.public_id) {
+        await deleteFromS3(doc.public_id);
+      }
+    }
+
+    await Document.deleteMany({
+      user: user._id,
+    });
+
+    await Transaction.deleteMany({
+      user: user._id,
+    });
+
+    await user.deleteOne();
+
+    res.json({
+      success: true,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
+  }
 };
 
 export const updateUser = async (req, res) => {
@@ -126,9 +173,10 @@ export const updateUser = async (req, res) => {
         user.subscriptionStatus = "cancelled";
         user.subscriptionPurchasedAt = null;
       } else {
-        const plan = await SubscriptionPlan.findOne({
-          name: req.body.subscription,
-        });
+        // const plan = await SubscriptionPlan.findOne({
+        //   name: req.body.subscription,
+        // });
+        const plan = await SubscriptionPlan.findById(req.body.subscriptionPlan);
 
         if (plan) {
           user.subscription = plan.name;
@@ -218,6 +266,11 @@ export const updateUser = async (req, res) => {
 };
 
 export const approveDocument = async (req, res) => {
+  if (!doc) {
+    return res.status(404).json({
+      message: "Document not found",
+    });
+  }
   const doc = await Document.findById(req.params.id);
 
   doc.status = "approved";
@@ -362,20 +415,40 @@ export const getTransactionById = async (req, res) => {
 
 /* ================= DOCUMENTS ================= */
 
+// export const getDocuments = async (req, res) => {
+//   try {
+//     const docs = await Document.find().populate("user", "name email").sort({
+//       createdAt: -1,
+//     });
+
+//     res.json(docs);
+//   } catch (error) {
+//     res.status(500).json({
+//       message: error.message,
+//     });
+//   }
+// };
 export const getDocuments = async (req, res) => {
   try {
-    const docs = await Document.find().populate("user", "name email").sort({
-      createdAt: -1,
-    });
+    const docs = await Document.find()
+      .populate("user", "name email")
+      .sort({ createdAt: -1 });
 
-    res.json(docs);
+    const documents = await Promise.all(
+      docs.map(async (doc) => ({
+        ...doc.toObject(),
+
+        fileUrl: doc.public_id ? await getSignedFileUrl(doc.public_id) : "",
+      })),
+    );
+
+    res.json(documents);
   } catch (error) {
     res.status(500).json({
       message: error.message,
     });
   }
 };
-
 /* ================= REJECT DOCUMENT ================= */
 
 export const rejectDocument = async (req, res) => {

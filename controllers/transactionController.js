@@ -1,13 +1,17 @@
 import razorpay from "../config/razorpay.js";
 import crypto from "crypto";
 import Transaction from "../models/Transaction.js";
-import PDFDocument from "pdfkit";
 
 import User from "../models/User.js";
 import SubscriptionPlan from "../models/SubscriptionPlan.js";
 
 import { sendEmail } from "../utils/sendEmail.js";
 import { subscriptionEmailTemplate } from "../utils/subscriptionEmailTemplate.js";
+
+import { generateInvoicePdf } from "../utils/generateInvoicePdf.js";
+
+import { uploadBufferToS3 } from "../utils/uploadToS3.js";
+import { getSignedFileUrl } from "../utils/uploadToS3.js";
 
 /* CREATE ORDER */
 
@@ -128,10 +132,18 @@ export const verifyPayment = async (req, res) => {
     }
 
     // Prevent duplicate verification
+    // if (transaction.status === "paid") {
+    //   return res.status(200).json({
+    //     success: true,
+    //     message: "Payment already verified",
+    //   });
+    // }
     if (transaction.status === "paid") {
       return res.status(200).json({
         success: true,
         message: "Payment already verified",
+
+        invoiceAvailable: !!transaction.invoiceKey,
       });
     }
 
@@ -156,12 +168,27 @@ export const verifyPayment = async (req, res) => {
     /* ================= TRANSACTION ================= */
 
     transaction.status = "paid";
+
     transaction.razorpay_payment_id = razorpay_payment_id;
+
     transaction.razorpay_signature = razorpay_signature;
 
     transaction.paidAt = new Date();
 
     transaction.invoiceNumber = `AGA-${Date.now()}`;
+
+    const pdfBuffer = await generateInvoicePdf(transaction, user);
+
+    const invoiceUpload = await uploadBufferToS3(
+      pdfBuffer,
+      `${transaction.invoiceNumber}.pdf`,
+      "application/pdf",
+      "private/invoices",
+    );
+
+    // transaction.invoiceUrl = invoiceUpload.url;
+
+    transaction.invoiceKey = invoiceUpload.key;
 
     await transaction.save();
 
@@ -257,155 +284,6 @@ export const verifyPayment = async (req, res) => {
   }
 };
 
-// export const verifyPayment = async (req, res) => {
-//   try {
-//     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
-//       req.body;
-
-//     const generatedSignature = crypto
-//       .createHmac("sha256", process.env.RAZORPAY_SECRET)
-//       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-//       .digest("hex");
-
-//     if (generatedSignature !== razorpay_signature) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Invalid payment signature",
-//       });
-//     }
-
-//     const transaction = await Transaction.findOne({
-//       razorpay_order_id,
-//     });
-
-//     if (!transaction) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Transaction not found",
-//       });
-//     }
-
-//     if (transaction.status === "paid") {
-//       return res.status(200).json({
-//         success: true,
-//         message: "Payment already verified",
-//       });
-//     }
-
-//     const user = await User.findById(transaction.user);
-
-//     if (!user) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "User not found",
-//       });
-//     }
-
-//     const plan = await SubscriptionPlan.findById(transaction.planId);
-
-//     if (!plan) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Plan not found",
-//       });
-//     }
-
-//     /* ================= TRANSACTION ================= */
-
-//     transaction.status = "paid";
-//     transaction.razorpay_payment_id = razorpay_payment_id;
-//     transaction.razorpay_signature = razorpay_signature;
-//     transaction.paidAt = new Date();
-//     transaction.invoiceNumber = `AGA-${Date.now()}`;
-
-//     await transaction.save();
-
-//     /* ================= SUBSCRIPTION ================= */
-
-//     const now = new Date();
-
-//     let expiry =
-//       user.subscriptionExpiry && user.subscriptionExpiry > now
-//         ? new Date(user.subscriptionExpiry)
-//         : new Date(now);
-
-//     expiry.setMonth(expiry.getMonth() + (plan.duration || 12));
-
-//     user.subscription = plan.name;
-//     user.subscriptionPlan = plan._id;
-//     user.subscriptionAmount = plan.price;
-//     user.subscriptionPurchasedAt = new Date();
-//     user.subscriptionStatus = "active";
-//     user.subscriptionExpiry = expiry;
-
-//     await user.save();
-
-//     /* ================= RESPONSE FIRST ================= */
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Payment verified successfully",
-//       subscription: {
-//         name: user.subscription,
-//         amount: user.subscriptionAmount,
-//         status: user.subscriptionStatus,
-//         expiry: user.subscriptionExpiry,
-//         purchasedAt: user.subscriptionPurchasedAt,
-//       },
-//     });
-
-//     /* ================= EMAILS IN BACKGROUND ================= */
-
-//     setImmediate(async () => {
-//       try {
-//         await sendEmail({
-//           to: user.email,
-//           subject: `Subscription Activated - ${plan.name}`,
-//           html: subscriptionEmailTemplate({
-//             name: user.name,
-//             planName: plan.name,
-//             amount: plan.price,
-//             expiryDate: expiry,
-//           }),
-//         });
-
-//         console.log(`Subscription email sent to ${user.email}`);
-//       } catch (error) {
-//         console.error("Subscription Email Error:", error);
-//       }
-
-//       try {
-//         if (process.env.ADMIN_EMAIL) {
-//           await sendEmail({
-//             to: process.env.ADMIN_EMAIL,
-//             subject: "New Subscription Purchase",
-//             html: `
-//               <h2>New Subscription Purchased</h2>
-
-//               <p><strong>Name:</strong> ${user.name}</p>
-//               <p><strong>Email:</strong> ${user.email}</p>
-//               <p><strong>Plan:</strong> ${plan.name}</p>
-//               <p><strong>Amount:</strong> ₹${plan.price}</p>
-//               <p><strong>Expiry:</strong> ${expiry.toLocaleDateString()}</p>
-//             `,
-//           });
-
-//           console.log("Admin email sent");
-//         }
-//       } catch (error) {
-//         console.error("Admin Email Error:", error);
-//       }
-//     });
-//   } catch (error) {
-//     console.error("Verify Payment Error:", error);
-
-//     res.status(500).json({
-//       success: false,
-//       message: "Payment verification failed",
-//     });
-//   }
-// };
-
 export const getBillingHistory = async (req, res) => {
   try {
     const transactions = await Transaction.find({
@@ -423,45 +301,64 @@ export const getBillingHistory = async (req, res) => {
 
 /* ================= INVOICE ================= */
 
+// export const downloadInvoice = async (req, res) => {
+//   try {
+//     const transaction = await Transaction.findById(req.params.id);
+
+//     if (!transaction) {
+//       return res.status(404).json({
+//         message: "Invoice not found",
+//       });
+//     }
+
+//     if (!transaction.invoiceUrl) {
+//       return res.status(404).json({
+//         message: "Invoice file not found",
+//       });
+//     }
+
+//     res.json({
+//       success: true,
+//       url: transaction.invoiceUrl,
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       message: error.message,
+//     });
+//   }
+// };
+
 export const downloadInvoice = async (req, res) => {
   try {
-    const transaction = await Transaction.findById(req.params.id).populate(
-      "user",
-    );
+    const transaction = await Transaction.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
 
     if (!transaction) {
-      return res.status(404).json({ message: "Invoice not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Invoice not found",
+      });
     }
 
-    const doc = new PDFDocument();
+    if (!transaction.invoiceKey) {
+      return res.status(404).json({
+        success: false,
+        message: "Invoice file missing",
+      });
+    }
 
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=invoice-${transaction._id}.pdf`,
-    );
+    const url = await getSignedFileUrl(transaction.invoiceKey);
 
-    doc.pipe(res);
-
-    doc.fontSize(20).text("AG & Associates Invoice", { align: "center" });
-
-    doc.moveDown();
-
-    doc.text(`Customer: ${transaction.user.name}`);
-    doc.text(`Email: ${transaction.user.email}`);
-    doc.text(`Plan: ${transaction.planName}`);
-    doc.text(`Amount: ₹${transaction.amount}`);
-    doc.text(`Payment Status: ${transaction.status}`);
-    doc.text(
-      `Invoice Date: ${new Date(transaction.createdAt).toLocaleDateString()}`,
-    );
-    doc.text(`Amount: ₹${transaction.amount}`);
-    doc.text(`Date: ${transaction.createdAt}`);
-
-    doc.end();
+    res.json({
+      success: true,
+      url,
+    });
   } catch (error) {
     res.status(500).json({
-      message: "Invoice generation failed",
+      success: false,
+      message: error.message,
     });
   }
 };

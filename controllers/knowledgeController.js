@@ -4,20 +4,71 @@ import KnowledgePost from "../models/KnowledgePost.js";
 import KnowledgeCategory from "../models/KnowledgeCategory.js";
 import KnowledgeQuestion from "../models/KnowledgeQuestion.js";
 import KnowledgeRating from "../models/KnowledgeRating.js";
-import cloudinary from "../config/cloudinary.js";
+
+import { uploadToS3, deleteFromS3 } from "../utils/uploadToS3.js";
+
+// export const createPost = async (req, res) => {
+//   try {
+//     const { title, content, category, status } = req.body;
+
+//     const slug = slugify(title, {
+//       lower: true,
+//       strict: true,
+//     });
+
+//     const exists = await KnowledgePost.findOne({
+//       slug,
+//     });
+
+//     if (exists) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Article already exists",
+//       });
+//     }
+
+//     const words = content?.replace(/<[^>]*>/g, "")?.split(/\s+/).length || 0;
+
+//     const readingTime = Math.max(1, Math.ceil(words / 200));
+
+//     const post = await KnowledgePost.create({
+//       ...req.body,
+
+//       slug,
+
+//       readingTime,
+
+//       featuredImage: req.file?.path || "",
+
+//       featuredImagePublicId: req.file?.filename || "",
+
+//       publishedAt: status === "published" ? new Date() : null,
+
+//       createdBy: req.user?._id,
+//     });
+
+//     res.status(201).json({
+//       success: true,
+//       data: post,
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// };
 
 export const createPost = async (req, res) => {
   try {
-    const { title, content, category, status } = req.body;
+    const { title, content, status } = req.body;
 
     const slug = slugify(title, {
       lower: true,
       strict: true,
     });
 
-    const exists = await KnowledgePost.findOne({
-      slug,
-    });
+    const exists = await KnowledgePost.findOne({ slug });
 
     if (exists) {
       return res.status(400).json({
@@ -26,9 +77,15 @@ export const createPost = async (req, res) => {
       });
     }
 
-    const words = content?.replace(/<[^>]*>/g, "")?.split(/\s+/).length || 0;
+    const words = content?.replace(/<[^>]*>/g, "").split(/\s+/).length || 0;
 
     const readingTime = Math.max(1, Math.ceil(words / 200));
+
+    let imageUpload = null;
+
+    if (req.file) {
+      imageUpload = await uploadToS3(req.file, "public/knowledge-center");
+    }
 
     const post = await KnowledgePost.create({
       ...req.body,
@@ -37,9 +94,9 @@ export const createPost = async (req, res) => {
 
       readingTime,
 
-      featuredImage: req.file?.path || "",
+      featuredImage: imageUpload?.url || "",
 
-      featuredImagePublicId: req.file?.filename || "",
+      featuredImagePublicId: imageUpload?.key || "",
 
       publishedAt: status === "published" ? new Date() : null,
 
@@ -51,12 +108,74 @@ export const createPost = async (req, res) => {
       data: post,
     });
   } catch (error) {
+    console.log(error);
+
     res.status(500).json({
       success: false,
       message: error.message,
     });
   }
 };
+
+// export const updatePost = async (req, res) => {
+//   try {
+//     const post = await KnowledgePost.findById(req.params.id);
+
+//     if (!post) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Article not found",
+//       });
+//     }
+
+//     let updateData = {
+//       ...req.body,
+//     };
+
+//     if (req.body.title) {
+//       updateData.slug = slugify(req.body.title, {
+//         lower: true,
+//         strict: true,
+//       });
+//     }
+
+//     if (req.body.content) {
+//       const words = req.body.content
+//         .replace(/<[^>]*>/g, "")
+//         .split(/\s+/).length;
+
+//       updateData.readingTime = Math.max(1, Math.ceil(words / 200));
+//     }
+
+//     if (req.file) {
+//       if (post.featuredImagePublicId) {
+//         await cloudinary.uploader.destroy(post.featuredImagePublicId);
+//       }
+
+//       updateData.featuredImage = req.file.path;
+
+//       updateData.featuredImagePublicId = req.file.filename;
+//     }
+
+//     const updated = await KnowledgePost.findByIdAndUpdate(
+//       req.params.id,
+//       updateData,
+//       {
+//         new: true,
+//       },
+//     );
+
+//     res.json({
+//       success: true,
+//       data: updated,
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// };
 
 export const updatePost = async (req, res) => {
   try {
@@ -90,12 +209,14 @@ export const updatePost = async (req, res) => {
 
     if (req.file) {
       if (post.featuredImagePublicId) {
-        await cloudinary.uploader.destroy(post.featuredImagePublicId);
+        await deleteFromS3(post.featuredImagePublicId);
       }
 
-      updateData.featuredImage = req.file.path;
+      const imageUpload = await uploadToS3(req.file, "knowledge-center");
 
-      updateData.featuredImagePublicId = req.file.filename;
+      updateData.featuredImage = imageUpload.url;
+
+      updateData.featuredImagePublicId = imageUpload.key;
     }
 
     const updated = await KnowledgePost.findByIdAndUpdate(
@@ -111,12 +232,51 @@ export const updatePost = async (req, res) => {
       data: updated,
     });
   } catch (error) {
+    console.log(error);
+
     res.status(500).json({
       success: false,
       message: error.message,
     });
   }
 };
+
+// export const deletePost = async (req, res) => {
+//   try {
+//     const post = await KnowledgePost.findById(req.params.id);
+
+//     if (!post) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Article not found",
+//       });
+//     }
+
+//     if (post.featuredImagePublicId) {
+//       await cloudinary.uploader.destroy(post.featuredImagePublicId);
+//     }
+
+//     await KnowledgeQuestion.deleteMany({
+//       post: post._id,
+//     });
+
+//     await KnowledgeRating.deleteMany({
+//       post: post._id,
+//     });
+
+//     await KnowledgePost.findByIdAndDelete(post._id);
+
+//     res.json({
+//       success: true,
+//       message: "Article deleted successfully",
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// };
 
 export const deletePost = async (req, res) => {
   try {
@@ -130,7 +290,7 @@ export const deletePost = async (req, res) => {
     }
 
     if (post.featuredImagePublicId) {
-      await cloudinary.uploader.destroy(post.featuredImagePublicId);
+      await deleteFromS3(post.featuredImagePublicId);
     }
 
     await KnowledgeQuestion.deleteMany({
@@ -148,6 +308,8 @@ export const deletePost = async (req, res) => {
       message: "Article deleted successfully",
     });
   } catch (error) {
+    console.log(error);
+
     res.status(500).json({
       success: false,
       message: error.message,
@@ -172,6 +334,12 @@ export const getPosts = async (req, res) => {
       query.$or = [
         {
           title: {
+            $regex: search,
+            $options: "i",
+          },
+        },
+        {
+          excerpt: {
             $regex: search,
             $options: "i",
           },
@@ -437,6 +605,7 @@ export const answerQuestion = async (req, res) => {
     });
   }
 };
+
 export const approveQuestion = async (req, res) => {
   try {
     const question = await KnowledgeQuestion.findByIdAndUpdate(

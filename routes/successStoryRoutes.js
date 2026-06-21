@@ -14,9 +14,11 @@ import {
   getStoryAnalytics,
   uploadStoryAssets,
 } from "../controllers/successStoryController.js";
+
 import { uploadSuccessStory } from "../middleware/uploadMiddleware.js";
 
 const router = express.Router();
+
 router.use(protect);
 router.use(adminOnly);
 
@@ -34,39 +36,8 @@ router.patch("/:id/feature", toggleFeatured);
 
 router.patch("/:id/publish", togglePublishStory);
 
-// router.post(
-//   "/upload-assets",
-//   uploadSuccessStory.fields([
-//     {
-//       name: "coverImage",
-//       maxCount: 1,
-//     },
-//     {
-//       name: "pdf",
-//       maxCount: 1,
-//     },
-//   ]),
-//   uploadStoryAssets,
-// );
+router.post("/upload-assets", uploadSuccessStory, uploadStoryAssets);
 
-router.post(
-  "/upload-assets",
-  uploadSuccessStory.fields([
-    {
-      name: "coverImage",
-      maxCount: 1,
-    },
-    {
-      name: "pdf",
-      maxCount: 1,
-    },
-  ]),
-  (req, res, next) => {
-    console.log("MULTER SUCCESS");
-    next();
-  },
-  uploadStoryAssets,
-);
 router.get("/:id", getStoryById);
 
 export default router;

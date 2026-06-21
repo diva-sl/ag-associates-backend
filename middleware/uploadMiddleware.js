@@ -1,66 +1,70 @@
 import multer from "multer";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
-import cloudinary from "../config/cloudinary.js";
 
-/* AVATAR STORAGE */
+const storage = multer.memoryStorage();
 
-const avatarStorage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: "ag-associates/avatars",
-    resource_type: "image",
-    allowed_formats: ["jpg", "jpeg", "png", "webp"],
+const imageFileFilter = (req, file, cb) => {
+  const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only JPG, PNG and WEBP images are allowed"), false);
+  }
+};
+
+const documentFileFilter = (req, file, cb) => {
+  const allowedTypes = [
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+    "application/pdf",
+  ];
+
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only Images and PDF files are allowed"), false);
+  }
+};
+
+const uploadImage = multer({
+  storage,
+  fileFilter: imageFileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024,
   },
 });
 
-/* DOCUMENT STORAGE */
-const documentStorage = new CloudinaryStorage({
-  cloudinary,
-  params: async (req, file) => ({
-    folder: "ag-associates/documents",
-    resource_type: "auto",
-    type: "upload",
-    allowed_formats: ["jpg", "jpeg", "png", "webp", "pdf"],
-  }),
+const uploadDocument = multer({
+  storage,
+  fileFilter: documentFileFilter,
+  limits: {
+    fileSize: 20 * 1024 * 1024,
+  },
 });
 
-/* SUCCESS STORY STORAGE */
+/* Avatar */
 
-const successStoryStorage = new CloudinaryStorage({
-  cloudinary,
+export const uploadAvatar = uploadImage.single("avatar");
 
-  params: async (req, file) => ({
-    folder:
-      file.fieldname === "pdf"
-        ? "ag-associates/success-stories/pdfs"
-        : "ag-associates/success-stories/images",
+/* Knowledge Center */
 
-    resource_type: "auto",
+export const uploadKnowledgePost = uploadImage.single("featuredImage");
 
-    allowed_formats: ["jpg", "jpeg", "png", "webp", "pdf"],
-  }),
-});
+/* User Documents */
 
-const knowledgeStorage = new CloudinaryStorage({
-  cloudinary,
+export const uploadUserDocument = uploadDocument.single("file");
 
-  params: async () => ({
-    folder: "ag-associates/knowledge-center",
+/* Success Story */
 
-    resource_type: "image",
-
-    allowed_formats: ["jpg", "jpeg", "png", "webp"],
-  }),
-});
-
-export const uploadAvatar = multer({ storage: avatarStorage });
-
-export const uploadDocument = multer({ storage: documentStorage });
-
-export const uploadSuccessStory = multer({
-  storage: successStoryStorage,
-});
-
-export const uploadKnowledgePost = multer({
-  storage: knowledgeStorage,
-});
+export const uploadSuccessStory = uploadDocument.fields([
+  {
+    name: "coverImage",
+    maxCount: 1,
+  },
+  {
+    name: "pdf",
+    maxCount: 1,
+  },
+]);

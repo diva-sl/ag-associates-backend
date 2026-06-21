@@ -1,5 +1,8 @@
 import SuccessStory from "../models/SuccessStory.js";
-import cloudinary from "../config/cloudinary.js";
+
+import { uploadToS3, deleteFromS3 } from "../utils/uploadToS3.js";
+
+import { getSignedFileUrl } from "../utils/uploadToS3.js";
 
 /* GET ALL */
 
@@ -43,6 +46,11 @@ export const getStoryById = async (req, res) => {
 /* CREATE */
 
 export const createStory = async (req, res) => {
+  if (!req.body.title) {
+    return res.status(400).json({
+      message: "Title is required",
+    });
+  }
   try {
     const story = await SuccessStory.create(req.body);
 
@@ -56,45 +64,71 @@ export const createStory = async (req, res) => {
 
 /* UPDATE */
 
-export const updateStory = async (req, res) => {
-  try {
-    const story = await SuccessStory.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true },
-    );
-
-    res.json(story);
-  } catch (error) {
-    res.status(500).json({
-      message: error.message,
-    });
-  }
-};
-
-/* DELETE */
-
-// export const deleteStory = async (req, res) => {
+// export const updateStory = async (req, res) => {
 //   try {
-//     const story = await SuccessStory.findById(req.params.id);
+//     const story = await SuccessStory.findByIdAndUpdate(
+//       req.params.id,
+//       req.body,
+//       { new: true },
+//     );
 
-//     if (!story) {
-//       return res.status(404).json({
-//         message: "Story not found",
-//       });
-//     }
-
-//     await story.deleteOne();
-
-//     res.json({
-//       success: true,
-//     });
+//     res.json(story);
 //   } catch (error) {
 //     res.status(500).json({
 //       message: error.message,
 //     });
 //   }
 // };
+
+export const updateStory = async (req, res) => {
+  try {
+    const story = await SuccessStory.findById(req.params.id);
+
+    if (!story) {
+      return res.status(404).json({
+        message: "Story not found",
+      });
+    }
+
+    Object.assign(story, req.body);
+
+    const updatedStory = await story.save();
+
+    res.json(updatedStory);
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+};
+/* DELETE */
+
+export const downloadStoryPdf = async (req, res) => {
+  try {
+    const story = await SuccessStory.findById(req.params.id);
+
+    if (!story) {
+      return res.status(404).json({
+        message: "Story not found",
+      });
+    }
+
+    story.downloads += 1;
+
+    await story.save();
+
+    const signedUrl = await getSignedFileUrl(story.pdfPublicId);
+
+    res.json({
+      success: true,
+      downloadUrl: signedUrl,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+};
 
 export const deleteStory = async (req, res) => {
   try {
@@ -106,20 +140,12 @@ export const deleteStory = async (req, res) => {
       });
     }
 
-    /* DELETE COVER IMAGE */
-
     if (story.coverImagePublicId) {
-      await cloudinary.uploader.destroy(story.coverImagePublicId, {
-        resource_type: "image",
-      });
+      await deleteFromS3(story.coverImagePublicId);
     }
 
-    /* DELETE PDF */
-
     if (story.pdfPublicId) {
-      await cloudinary.uploader.destroy(story.pdfPublicId, {
-        resource_type: "raw",
-      });
+      await deleteFromS3(story.pdfPublicId);
     }
 
     await story.deleteOne();
@@ -129,11 +155,14 @@ export const deleteStory = async (req, res) => {
       message: "Story deleted successfully",
     });
   } catch (error) {
+    console.error(error);
+
     res.status(500).json({
       message: error.message,
     });
   }
 };
+
 /* FEATURE */
 export const toggleFeatured = async (req, res) => {
   try {
@@ -245,51 +274,50 @@ export const getStoryAnalytics = async (req, res) => {
   }
 };
 
-// export const uploadStoryAssets = async (req, res) => {
-//   try {
-//     console.log(req.files);
-//     const coverImage = req.files?.coverImage?.[0];
-
-//     const pdf = req.files?.pdf?.[0];
-
-//     res.json({
-//       coverImage: coverImage?.path || "",
-
-//       coverImagePublicId: coverImage?.filename || "",
-
-//       pdfUrl: pdf?.path || "",
-
-//       pdfPublicId: pdf?.filename || "",
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       message: error.message,
-//     });
-//   }
-// };
 export const uploadStoryAssets = async (req, res) => {
   try {
-    console.log("FILES =>", req.files);
-
     const coverImage = req.files?.coverImage?.[0];
     const pdf = req.files?.pdf?.[0];
 
-    console.log("IMAGE =>", coverImage);
-    console.log("PDF =>", pdf);
+    let imageUpload = null;
+    let pdfUpload = null;
+
+    // if (coverImage) {
+    //   imageUpload = await uploadToS3(coverImage, "success-stories/images");
+    // }
+
+    // if (pdf) {
+    //   pdfUpload = await uploadToS3(pdf, "success-stories/pdfs");
+    // }
+
+    if (coverImage) {
+      imageUpload = await uploadToS3(
+        coverImage,
+        "public/success-stories/images",
+      );
+    }
+
+    if (pdf) {
+      pdfUpload = await uploadToS3(pdf, "private/success-stories/pdfs");
+    }
 
     res.json({
-      coverImage: coverImage?.path || "",
-      coverImagePublicId: coverImage?.filename || "",
+      success: true,
 
-      pdfUrl: pdf?.path || "",
-      pdfPublicId: pdf?.filename || "",
+      coverImage: imageUpload?.url || "",
+
+      coverImagePublicId: imageUpload?.key || "",
+
+      pdfUrl: pdfUpload?.url || "",
+
+      pdfPublicId: pdfUpload?.key || "",
     });
   } catch (error) {
     console.error("UPLOAD ERROR =>", error);
 
     res.status(500).json({
+      success: false,
       message: error.message,
-      stack: error.stack,
     });
   }
 };
@@ -311,30 +339,30 @@ export const getPublishedStories = async (req, res) => {
   }
 };
 
-export const downloadStoryPdf = async (req, res) => {
-  try {
-    const story = await SuccessStory.findById(req.params.id);
+// export const downloadStoryPdf = async (req, res) => {
+//   try {
+//     const story = await SuccessStory.findById(req.params.id);
 
-    if (!story) {
-      return res.status(404).json({
-        message: "Story not found",
-      });
-    }
+//     if (!story) {
+//       return res.status(404).json({
+//         message: "Story not found",
+//       });
+//     }
 
-    story.downloads += 1;
+//     story.downloads += 1;
 
-    await story.save();
+//     await story.save();
 
-    res.json({
-      success: true,
-      downloadUrl: story.pdfUrl,
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: error.message,
-    });
-  }
-};
+//     res.json({
+//       success: true,
+//       downloadUrl: story.pdfUrl,
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       message: error.message,
+//     });
+//   }
+// };
 
 export const getPublicStoryById = async (req, res) => {
   try {

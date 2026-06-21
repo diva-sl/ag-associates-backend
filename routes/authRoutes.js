@@ -11,11 +11,16 @@ import {
 
 import { protect } from "../middleware/authMiddleware.js";
 
-import cloudinary from "../config/cloudinary.js";
+import {
+  uploadToS3,
+  uploadPrivateToS3,
+  deleteFromS3,
+  getSignedFileUrl,
+} from "../utils/uploadToS3.js";
 
 import {
   uploadAvatar,
-  uploadDocument,
+  uploadUserDocument,
 } from "../middleware/uploadMiddleware.js";
 
 import Document from "../models/Document.js";
@@ -91,66 +96,133 @@ router.get(
 );
 /* AVATAR UPLOAD */
 
-router.put(
-  "/avatar",
-  protect,
-  uploadAvatar.single("avatar"),
-  async (req, res) => {
-    req.user.avatar = req.file.path;
+// router.put("/avatar", protect, uploadAvatar, async (req, res) => {
+//   try {
+//     const avatarUpload = await uploadToS3(req.file, "public/avatars");
+//     req.user.avatar = avatarUpload.url;
+
+//     const updatedUser = await req.user.save();
+
+//     res.json({
+//       success: true,
+//       avatar: avatarUpload.url,
+//       user: updatedUser,
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       message: error.message,
+//     });
+//   }
+// });
+router.put("/avatar", protect, uploadAvatar, async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        message: "No file uploaded",
+      });
+    }
+
+    /* Delete Old Avatar */
+
+    if (req.user.avatarKey) {
+      await deleteFromS3(req.user.avatarKey);
+    }
+
+    const avatarUpload = await uploadToS3(req.file, "public/avatars");
+
+    req.user.avatar = avatarUpload.url;
+
+    req.user.avatarKey = avatarUpload.key;
 
     const updatedUser = await req.user.save();
 
     res.json({
       success: true,
-      avatar: req.file.path,
+      avatar: avatarUpload.url,
       user: updatedUser,
     });
-  },
-);
+  } catch (error) {
+    console.error(error);
 
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+});
 /* AVATAR REMOVE */
 
+// router.delete("/avatar", protect, async (req, res) => {
+//   req.user.avatar = "";
+
+//   const updatedUser = await req.user.save();
+
+//   res.json({
+//     success: true,
+//     user: updatedUser,
+//   });
+// });
+
 router.delete("/avatar", protect, async (req, res) => {
-  req.user.avatar = "";
+  try {
+    if (req.user.avatarKey) {
+      await deleteFromS3(req.user.avatarKey);
+    }
 
-  const updatedUser = await req.user.save();
+    req.user.avatar = "";
 
-  res.json({
-    success: true,
-    user: updatedUser,
-  });
+    req.user.avatarKey = "";
+
+    const updatedUser = await req.user.save();
+
+    res.json({
+      success: true,
+      user: updatedUser,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
+  }
 });
-
 /* ================= PASSWORD ================= */
 
 router.put("/change-password", protect, changePassword);
 router.post("/forgot-password", forgotPassword);
 router.put("/reset-password/:token", resetPassword);
 /* DOCUMENT UPLOAD */
-
 router.get("/documents", protect, async (req, res) => {
   const docs = await Document.find({
     user: req.user._id,
-  }).sort({ createdAt: -1 });
+  });
 
-  res.json(docs);
+  const documents = await Promise.all(
+    docs.map(async (doc) => ({
+      ...doc.toObject(),
+      fileUrl: await getSignedFileUrl(doc.public_id),
+    })),
+  );
+
+  res.json(documents);
 });
 
 router.post(
   "/upload-document",
   protect,
-  uploadDocument.single("file"),
+  uploadUserDocument,
   async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
       }
-
+      const uploadedFile = await uploadPrivateToS3(
+        req.file,
+        "private/documents",
+      );
       const doc = await Document.create({
         user: req.user._id,
         type: req.body.type,
-        fileUrl: req.file.path,
-        public_id: req.file.filename,
+        fileUrl: "",
+        public_id: uploadedFile.key,
       });
 
       res.json({
@@ -174,17 +246,7 @@ router.delete("/document/:id", protect, async (req, res) => {
       });
     }
 
-    console.log("Deleting:", doc.public_id);
-
-    try {
-      await cloudinary.uploader.destroy(doc.public_id, {
-        resource_type: "image",
-      });
-    } catch (err) {
-      await cloudinary.uploader.destroy(doc.public_id, {
-        resource_type: "raw",
-      });
-    }
+    await deleteFromS3(doc.public_id);
 
     await doc.deleteOne();
 
@@ -193,11 +255,8 @@ router.delete("/document/:id", protect, async (req, res) => {
       message: "Document deleted successfully",
     });
   } catch (error) {
-    console.error("Delete error:", error);
-
     res.status(500).json({
-      message: "Document delete failed",
-      error: error.message,
+      message: error.message,
     });
   }
 });

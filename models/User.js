@@ -185,6 +185,7 @@ const userSchema = new mongoose.Schema(
     avatar: {
       type: String,
     },
+    avatarKey: { type: String },
 
     /* ================= PASSWORD RESET ================= */
 
