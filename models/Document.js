@@ -14,7 +14,19 @@ const documentSchema = new mongoose.Schema(
 
     fileUrl: String,
 
-    public_id: String,
+    public_id: {
+      type: String,
+      required: true,
+    },
+    fileName: {
+      type: String,
+      required: true,
+    },
+
+    mimeType: {
+      type: String,
+      required: true,
+    },
     status: {
       type: String,
       enum: ["pending", "approved", "rejected"],

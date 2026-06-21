@@ -16,6 +16,7 @@ import {
   uploadPrivateToS3,
   deleteFromS3,
   getSignedFileUrl,
+  getDownloadSignedUrl,
 } from "../utils/uploadToS3.js";
 
 import {
@@ -39,32 +40,6 @@ router.get("/profile", protect, (req, res) => {
 });
 
 router.put("/profile", protect, updateProfile);
-
-/* GOOGLE LOGIN */
-
-// router.get(
-//   "/google",
-//   passport.authenticate("google", { scope: ["profile", "email"] }),
-// );
-
-// router.get(
-//   "/google/callback",
-//   passport.authenticate("google", {
-//     session: false,
-//     failureRedirect: `${process.env.FRONTEND_URL}/login`,
-//   }),
-//   (req, res) => {
-//     const { token, user } = req.user;
-
-//     res.redirect(
-//       `${process.env.FRONTEND_URL}/google-success?token=${token}&name=${encodeURIComponent(
-//         user.name,
-//       )}&email=${encodeURIComponent(user.email)}&avatar=${encodeURIComponent(
-//         user.avatar || "",
-//       )}`,
-//     );
-//   },
-// );
 
 router.get("/google", (req, res, next) => {
   const redirect = req.query.redirect || "";
@@ -94,26 +69,6 @@ router.get(
     );
   },
 );
-/* AVATAR UPLOAD */
-
-// router.put("/avatar", protect, uploadAvatar, async (req, res) => {
-//   try {
-//     const avatarUpload = await uploadToS3(req.file, "public/avatars");
-//     req.user.avatar = avatarUpload.url;
-
-//     const updatedUser = await req.user.save();
-
-//     res.json({
-//       success: true,
-//       avatar: avatarUpload.url,
-//       user: updatedUser,
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       message: error.message,
-//     });
-//   }
-// });
 router.put("/avatar", protect, uploadAvatar, async (req, res) => {
   try {
     if (!req.file) {
@@ -151,17 +106,6 @@ router.put("/avatar", protect, uploadAvatar, async (req, res) => {
 });
 /* AVATAR REMOVE */
 
-// router.delete("/avatar", protect, async (req, res) => {
-//   req.user.avatar = "";
-
-//   const updatedUser = await req.user.save();
-
-//   res.json({
-//     success: true,
-//     user: updatedUser,
-//   });
-// });
-
 router.delete("/avatar", protect, async (req, res) => {
   try {
     if (req.user.avatarKey) {
@@ -191,20 +135,31 @@ router.post("/forgot-password", forgotPassword);
 router.put("/reset-password/:token", resetPassword);
 /* DOCUMENT UPLOAD */
 router.get("/documents", protect, async (req, res) => {
-  const docs = await Document.find({
-    user: req.user._id,
-  });
+  try {
+    const docs = await Document.find({
+      user: req.user._id,
+    }).sort({
+      createdAt: -1,
+    });
 
-  const documents = await Promise.all(
-    docs.map(async (doc) => ({
-      ...doc.toObject(),
-      fileUrl: await getSignedFileUrl(doc.public_id),
-    })),
-  );
+    const documents = await Promise.all(
+      docs.map(async (doc) => ({
+        ...doc.toObject(),
 
-  res.json(documents);
+        fileUrl: await getSignedFileUrl(doc.public_id),
+      })),
+    );
+
+    res.json({
+      success: true,
+      documents,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
+  }
 });
-
 router.post(
   "/upload-document",
   protect,
@@ -212,33 +167,73 @@ router.post(
   async (req, res) => {
     try {
       if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
+        return res.status(400).json({
+          message: "No file uploaded",
+        });
       }
+
       const uploadedFile = await uploadPrivateToS3(
         req.file,
         "private/documents",
       );
-      const doc = await Document.create({
+
+      const document = await Document.create({
         user: req.user._id,
+
         type: req.body.type,
-        fileUrl: "",
+
+        fileName: req.file.originalname,
+
+        mimeType: req.file.mimetype,
+
         public_id: uploadedFile.key,
       });
 
-      res.json({
+      res.status(201).json({
         success: true,
-        document: doc,
+        document,
       });
     } catch (error) {
-      console.error("Upload error:", error);
-      res.status(500).json({ message: "Document upload failed" });
+      console.error(error);
+
+      res.status(500).json({
+        message: "Document upload failed",
+      });
     }
   },
 );
 
+router.get("/document/:id/download", protect, async (req, res) => {
+  try {
+    const doc = await Document.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
+
+    if (!doc) {
+      return res.status(404).json({
+        message: "Document not found",
+      });
+    }
+
+    const url = await getDownloadSignedUrl(doc.public_id, doc.fileName);
+    res.json({
+      success: true,
+      url,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+});
+
 router.delete("/document/:id", protect, async (req, res) => {
   try {
-    const doc = await Document.findById(req.params.id);
+    const doc = await Document.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
 
     if (!doc) {
       return res.status(404).json({

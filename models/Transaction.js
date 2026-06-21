@@ -56,6 +56,40 @@ const transactionSchema = new mongoose.Schema(
     expiresAt: {
       type: Date,
     },
+    subtotal: {
+      type: Number,
+      default: 0,
+    },
+
+    gstRate: {
+      type: Number,
+      default: 18,
+    },
+
+    cgstAmount: {
+      type: Number,
+      default: 0,
+    },
+
+    sgstAmount: {
+      type: Number,
+      default: 0,
+    },
+
+    gstAmount: {
+      type: Number,
+      default: 0,
+    },
+
+    totalAmount: {
+      type: Number,
+      default: 0,
+    },
+
+    paymentMethod: {
+      type: String,
+      default: "Razorpay",
+    },
   },
   { timestamps: true },
 );

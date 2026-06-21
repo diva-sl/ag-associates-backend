@@ -10,8 +10,7 @@ import { subscriptionEmailTemplate } from "../utils/subscriptionEmailTemplate.js
 
 import { generateInvoicePdf } from "../utils/generateInvoicePdf.js";
 
-import { uploadBufferToS3 } from "../utils/uploadToS3.js";
-import { getSignedFileUrl } from "../utils/uploadToS3.js";
+import { uploadBufferToS3, getDownloadSignedUrl } from "../utils/uploadToS3.js";
 
 /* CREATE ORDER */
 
@@ -67,20 +66,48 @@ export const createOrder = async (req, res) => {
       });
     }
 
+    const subtotal = Number(plan.price);
+
+    const gstRate = 18;
+
+    const cgstAmount = Number((subtotal * 9) / 100);
+
+    const sgstAmount = Number((subtotal * 9) / 100);
+
+    const gstAmount = cgstAmount + sgstAmount;
+
+    const totalAmount = subtotal + gstAmount;
+
     const options = {
-      amount: Number(plan.price) * 100,
+      amount: totalAmount * 100,
       currency: "INR",
       receipt: `receipt_${Date.now()}`,
     };
-
     const order = await razorpay.orders.create(options);
 
     const transaction = await Transaction.create({
       user: req.user._id,
+
       planId: plan._id,
+
       planName: plan.name,
-      amount: plan.price,
+
+      amount: subtotal,
+
+      subtotal,
+
+      gstRate,
+
+      cgstAmount,
+
+      sgstAmount,
+
+      gstAmount,
+
+      totalAmount,
+
       razorpay_order_id: order.id,
+
       status: "created",
     });
 
@@ -164,6 +191,7 @@ export const verifyPayment = async (req, res) => {
         message: "Plan not found",
       });
     }
+    const year = new Date().getFullYear();
 
     /* ================= TRANSACTION ================= */
 
@@ -173,9 +201,14 @@ export const verifyPayment = async (req, res) => {
 
     transaction.razorpay_signature = razorpay_signature;
 
+    transaction.paymentMethod = "Razorpay";
+
     transaction.paidAt = new Date();
 
-    transaction.invoiceNumber = `AGA-${Date.now()}`;
+    transaction.invoiceNumber = `AGA-${year}-${Math.floor(
+      1000 + Math.random() * 9000,
+    )}`;
+    // transaction.invoiceNumber = `AGA-${Date.now()}`;
 
     const pdfBuffer = await generateInvoicePdf(transaction, user);
 
@@ -185,8 +218,6 @@ export const verifyPayment = async (req, res) => {
       "application/pdf",
       "private/invoices",
     );
-
-    // transaction.invoiceUrl = invoiceUpload.url;
 
     transaction.invoiceKey = invoiceUpload.key;
 
@@ -220,19 +251,16 @@ export const verifyPayment = async (req, res) => {
     /* ================= USER EMAIL ================= */
 
     try {
-      console.log({
-        SMTP_HOST: process.env.SMTP_HOST,
-        SMTP_PORT: process.env.SMTP_PORT,
-        SMTP_EMAIL: process.env.SMTP_EMAIL,
-        SMTP_PASSWORD: process.env.SMTP_PASSWORD ? "FOUND" : "MISSING",
-      });
       await sendEmail({
         to: user.email,
         subject: `Subscription Activated - ${plan.name}`,
         html: subscriptionEmailTemplate({
           name: user.name,
           planName: plan.name,
-          amount: plan.price,
+          subtotal: transaction.subtotal,
+          gstAmount: transaction.gstAmount,
+          totalAmount: transaction.totalAmount,
+          invoiceNumber: transaction.invoiceNumber,
           expiryDate: expiry,
         }),
       });
@@ -246,16 +274,48 @@ export const verifyPayment = async (req, res) => {
       if (process.env.ADMIN_EMAIL) {
         await sendEmail({
           to: process.env.ADMIN_EMAIL,
-          subject: "New Subscription Purchase",
+          subject: `💰 New Subscription Purchase - ${plan.name}`,
           html: `
-            <h2>New Subscription Purchased</h2>
+  <div style="font-family:Arial,sans-serif;max-width:700px;margin:auto;background:#fff;border-radius:16px;border:1px solid #eee;overflow:hidden;">
 
-            <p><strong>Name:</strong> ${user.name}</p>
-            <p><strong>Email:</strong> ${user.email}</p>
-            <p><strong>Plan:</strong> ${plan.name}</p>
-            <p><strong>Amount:</strong> ₹${plan.price}</p>
-            <p><strong>Expiry:</strong> ${expiry.toLocaleDateString()}</p>
-          `,
+    <div style="background:linear-gradient(135deg,#511D43,#901E3E);padding:25px;text-align:center;color:white;">
+      <h2 style="margin:0;">AG & ASSOCIATES</h2>
+      <p style="margin-top:10px;">New Subscription Purchase</p>
+    </div>
+
+    <div style="padding:30px;">
+
+      <h3>Customer Details</h3>
+
+      <p><strong>Name:</strong> ${user.name}</p>
+      <p><strong>Email:</strong> ${user.email}</p>
+
+      <hr>
+
+      <h3>Subscription Details</h3>
+
+      <p><strong>Plan:</strong> ${plan.name}</p>
+      <p><strong>Invoice No:</strong> ${transaction.invoiceNumber}</p>
+
+      <p><strong>Plan Amount:</strong> ₹${transaction.subtotal}</p>
+      <p><strong>GST (18%):</strong> ₹${transaction.gstAmount}</p>
+
+      <p style="
+      font-size:18px;
+      color:#511D43;
+      font-weight:bold;
+      ">
+      Total Paid: ₹${transaction.totalAmount}
+      </p>
+
+      <p><strong>Expiry:</strong> ${expiry.toLocaleDateString()}</p>
+
+      <p><strong>Payment ID:</strong> ${transaction.razorpay_payment_id}</p>
+
+    </div>
+
+  </div>
+  `,
         });
       }
     } catch (error) {
@@ -289,7 +349,9 @@ export const getBillingHistory = async (req, res) => {
     const transactions = await Transaction.find({
       user: req.user._id,
       status: "paid",
-    }).sort({ createdAt: -1 });
+    })
+      .populate("planId", "name")
+      .sort({ createdAt: -1 });
 
     res.json(transactions);
   } catch (error) {
@@ -300,33 +362,6 @@ export const getBillingHistory = async (req, res) => {
 };
 
 /* ================= INVOICE ================= */
-
-// export const downloadInvoice = async (req, res) => {
-//   try {
-//     const transaction = await Transaction.findById(req.params.id);
-
-//     if (!transaction) {
-//       return res.status(404).json({
-//         message: "Invoice not found",
-//       });
-//     }
-
-//     if (!transaction.invoiceUrl) {
-//       return res.status(404).json({
-//         message: "Invoice file not found",
-//       });
-//     }
-
-//     res.json({
-//       success: true,
-//       url: transaction.invoiceUrl,
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       message: error.message,
-//     });
-//   }
-// };
 
 export const downloadInvoice = async (req, res) => {
   try {
@@ -349,8 +384,10 @@ export const downloadInvoice = async (req, res) => {
       });
     }
 
-    const url = await getSignedFileUrl(transaction.invoiceKey);
-
+    const url = await getDownloadSignedUrl(
+      transaction.invoiceKey,
+      `${transaction.invoiceNumber}.pdf`,
+    );
     res.json({
       success: true,
       url,

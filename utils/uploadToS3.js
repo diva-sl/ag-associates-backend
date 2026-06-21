@@ -90,6 +90,18 @@ export const getSignedFileUrl = async (key) => {
   });
 
   return await getSignedUrl(s3, command, {
-    expiresIn: 300,
+    expiresIn: 3600,
+  });
+};
+
+export const getDownloadSignedUrl = async (key, fileName) => {
+  const command = new GetObjectCommand({
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Key: key,
+    ResponseContentDisposition: `attachment; filename="${fileName}"`,
+  });
+
+  return await getSignedUrl(s3, command, {
+    expiresIn: 3600,
   });
 };
