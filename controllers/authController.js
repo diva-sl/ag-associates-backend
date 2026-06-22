@@ -131,6 +131,7 @@ export const updateProfile = async (req, res) => {
     // ✅ SAFE UPDATE (NO EMPTY OVERRIDE BUG)
     if (req.body.name !== undefined) user.name = req.body.name;
     if (req.body.phone !== undefined) user.phone = req.body.phone;
+    if (req.body.email !== undefined) user.email = req.body.email;
     if (req.body.address !== undefined) user.address = req.body.address;
     if (req.body.pan !== undefined) user.pan = req.body.pan.toUpperCase() || "";
     if (req.body.aadhaar !== undefined) user.aadhaar = req.body.aadhaar;

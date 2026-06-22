@@ -260,6 +260,38 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
+    /* ================= KYC VERIFICATION ================= */
+
+    panStatus: {
+      type: String,
+      enum: ["not_uploaded", "pending", "approved", "rejected"],
+      default: "not_uploaded",
+    },
+
+    aadhaarStatus: {
+      type: String,
+      enum: ["not_uploaded", "pending", "approved", "rejected"],
+      default: "not_uploaded",
+    },
+
+    gstinStatus: {
+      type: String,
+      enum: ["not_uploaded", "pending", "approved", "rejected"],
+      default: "not_uploaded",
+    },
+
+    panRejectReason: String,
+    aadhaarRejectReason: String,
+    gstinRejectReason: String,
+
+    kycVerifiedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+
+    kycVerifiedAt: {
+      type: Date,
+    },
   },
 
   {

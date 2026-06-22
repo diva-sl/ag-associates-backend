@@ -10,6 +10,7 @@ import {
 } from "../controllers/authController.js";
 
 import { protect } from "../middleware/authMiddleware.js";
+import User from "../models/User.js";
 
 import {
   uploadToS3,
@@ -179,16 +180,34 @@ router.post(
 
       const document = await Document.create({
         user: req.user._id,
-
         type: req.body.type,
-
         fileName: req.file.originalname,
-
         mimeType: req.file.mimetype,
-
         public_id: uploadedFile.key,
       });
 
+      const user = await User.findById(req.user._id);
+
+      if (user) {
+        switch (req.body.type) {
+          case "PAN_CARD":
+            user.panStatus = "pending";
+            break;
+
+          case "AADHAAR_CARD":
+            user.aadhaarStatus = "pending";
+            break;
+
+          case "GST_CERTIFICATE":
+            user.gstinStatus = "pending";
+            break;
+
+          default:
+            break;
+        }
+
+        await user.save();
+      }
       res.status(201).json({
         success: true,
         document,

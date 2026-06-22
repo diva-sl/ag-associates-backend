@@ -73,10 +73,9 @@ router.get("/analytics/revenue", getRevenueAnalytics);
 /* ================= DOCUMENTS ================= */
 
 router.get("/documents", getDocuments);
+router.patch("/documents/:id/approve", protect, adminOnly, approveDocument);
 
-router.patch("/documents/:id/approve", approveDocument);
-
-router.patch("/documents/:id/reject", rejectDocument);
+router.patch("/documents/:id/reject", protect, adminOnly, rejectDocument);
 
 router.get("/subscriptions", getSubscriptions);
 

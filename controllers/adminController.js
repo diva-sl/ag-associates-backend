@@ -200,6 +200,32 @@ export const updateUser = async (req, res) => {
     if (req.body.subscriptionStatus) {
       user.subscriptionStatus = req.body.subscriptionStatus;
     }
+    /* ================= DOCUMENT DETAILS ================= */
+    user.panStatus = req.body.panStatus ?? user.panStatus;
+
+    user.panRejectReason = req.body.panRejectReason ?? user.panRejectReason;
+
+    user.aadhaarStatus = req.body.aadhaarStatus ?? user.aadhaarStatus;
+
+    user.aadhaarRejectReason =
+      req.body.aadhaarRejectReason ?? user.aadhaarRejectReason;
+
+    user.gstinStatus = req.body.gstinStatus ?? user.gstinStatus;
+
+    user.gstinRejectReason =
+      req.body.gstinRejectReason ?? user.gstinRejectReason;
+
+    if (user.panStatus === "approved") {
+      user.panRejectReason = "";
+    }
+
+    if (user.aadhaarStatus === "approved") {
+      user.aadhaarRejectReason = "";
+    }
+
+    if (user.gstinStatus === "approved") {
+      user.gstinRejectReason = "";
+    }
 
     /* ================= AUTO EXPIRE ================= */
 
@@ -266,22 +292,61 @@ export const updateUser = async (req, res) => {
 };
 
 export const approveDocument = async (req, res) => {
-  if (!doc) {
-    return res.status(404).json({
-      message: "Document not found",
+  try {
+    const doc = await Document.findById(req.params.id);
+
+    if (!doc) {
+      return res.status(404).json({
+        success: false,
+        message: "Document not found",
+      });
+    }
+
+    doc.status = "approved";
+    doc.reviewedBy = req.user._id;
+    doc.reviewedAt = new Date();
+
+    await doc.save();
+
+    const user = await User.findById(doc.user);
+
+    if (user) {
+      switch (doc.type) {
+        case "PAN_CARD":
+          user.panStatus = "approved";
+          user.panRejectReason = "";
+          break;
+
+        case "AADHAAR_CARD":
+          user.aadhaarStatus = "approved";
+          user.aadhaarRejectReason = "";
+          break;
+
+        case "GST_CERTIFICATE":
+          user.gstinStatus = "approved";
+          user.gstinRejectReason = "";
+          break;
+
+        default:
+          break;
+      }
+
+      user.kycVerifiedBy = req.user._id;
+      user.kycVerifiedAt = new Date();
+
+      await user.save();
+    }
+    res.json({
+      success: true,
+      message: "Document approved",
+      document: doc,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
     });
   }
-  const doc = await Document.findById(req.params.id);
-
-  doc.status = "approved";
-
-  doc.reviewedBy = req.user._id;
-
-  doc.reviewedAt = new Date();
-
-  await doc.save();
-
-  res.json(doc);
 };
 
 /* ================= REVENUE ANALYTICS ================= */
@@ -358,13 +423,16 @@ export const getUserById = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("-password");
 
-    if (!user) {
-      return res.status(404).json({
-        message: "User not found",
-      });
-    }
+    const documents = await Document.find({
+      user: user._id,
+    }).sort({
+      createdAt: -1,
+    });
 
-    res.json(user);
+    res.json({
+      ...user.toObject(),
+      documents,
+    });
   } catch (error) {
     res.status(500).json({
       message: error.message,
@@ -457,22 +525,56 @@ export const rejectDocument = async (req, res) => {
 
     if (!doc) {
       return res.status(404).json({
+        success: false,
         message: "Document not found",
       });
     }
 
+    const rejectReason = req.body.reason || req.body.remarks || "";
+
     doc.status = "rejected";
-
     doc.reviewedBy = req.user._id;
-
     doc.reviewedAt = new Date();
+    doc.remarks = rejectReason;
 
     await doc.save();
 
-    res.json(doc);
+    const user = await User.findById(doc.user);
+
+    if (user) {
+      switch (doc.type) {
+        case "PAN_CARD":
+          user.panStatus = "rejected";
+          user.panRejectReason = rejectReason;
+          break;
+
+        case "AADHAAR_CARD":
+          user.aadhaarStatus = "rejected";
+          user.aadhaarRejectReason = rejectReason;
+          break;
+
+        case "GST_CERTIFICATE":
+          user.gstinStatus = "rejected";
+          user.gstinRejectReason = rejectReason;
+          break;
+
+        default:
+          break;
+      }
+
+      await user.save();
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Document rejected successfully",
+      document: doc,
+    });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
+      success: false,
       message: error.message,
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
     });
   }
 };
