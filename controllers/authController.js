@@ -96,20 +96,35 @@ export const login = async (req, res) => {
     user.lastDevice = req.headers["user-agent"];
 
     await user.save();
-
     res.json({
       user: {
         _id: user._id,
         name: user.name,
         email: user.email,
+
         avatar: user.avatar,
-        role: user.role,
         avatarKey: user.avatarKey,
+
+        role: user.role,
 
         subscription: user.subscription,
         subscriptionStatus: user.subscriptionStatus,
         subscriptionExpiry: user.subscriptionExpiry,
+
+        panStatus: user.panStatus,
+        aadhaarStatus: user.aadhaarStatus,
+        gstinStatus: user.gstinStatus,
+
+        pan: user.pan,
+        aadhaar: user.aadhaar,
+        gstin: user.gstin,
+
+        phone: user.phone,
+        address: user.address,
+
+        googleId: user.googleId,
       },
+
       token: generateToken(user._id),
     });
   } catch (error) {
