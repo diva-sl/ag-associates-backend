@@ -52,16 +52,20 @@ router.get("/google", (req, res, next) => {
 
 router.get(
   "/google/callback",
-  passport.authenticate("google", {
+  passport.authenticate({
     session: false,
-    failureRedirect: `${process.env.FRONTEND_URL}/auth`,
+    failureRedirect: "/auth",
   }),
   (req, res) => {
     const { token, user } = req.user;
 
-    // 🔥 BLOCKED USER CHECK
+    const frontendUrl =
+      process.env.NODE_ENV === "production"
+        ? "https://agandassociates.org"
+        : "http://localhost:5173";
+
     if (user.isBlocked) {
-      return res.redirect(`${process.env.FRONTEND_URL}/auth?error=blocked`);
+      return res.redirect(`${frontendUrl}/auth?error=blocked`);
     }
 
     const redirect = req.query.state || "";
@@ -69,7 +73,7 @@ router.get(
     const encodedUser = encodeURIComponent(JSON.stringify(user));
 
     res.redirect(
-      `${process.env.FRONTEND_URL}/google-success?token=${token}&user=${encodedUser}&redirect=${redirect}`,
+      `${frontendUrl}/google-success?token=${token}&user=${encodedUser}&redirect=${redirect}`,
     );
   },
 );
