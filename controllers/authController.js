@@ -45,14 +45,22 @@ export const register = async (req, res) => {
     });
     res.status(201).json({
       success: true,
+      token: generateToken(user._id),
+
       user: {
         _id: user._id,
         name: user.name,
         email: user.email,
+
         avatar: user.avatar,
+        avatarKey: user.avatarKey,
+
         role: user.role,
+
+        isBlocked: user.isBlocked,
+
+        googleId: user.googleId,
       },
-      token: generateToken(user._id),
     });
   } catch (error) {
     console.error("Register Error:", error);
@@ -64,19 +72,39 @@ export const register = async (req, res) => {
 
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    let { email, password } = req.body;
 
-    if (!password) {
-      return res.status(400).json({ message: "Password is required" });
+    if (!email || !password) {
+      return res.status(400).json({
+        message: "Email and password are required",
+      });
     }
 
-    const user = await User.findOne({ email }).select("+password");
+    email = email.toLowerCase().trim();
+
+    const user = await User.findOne({
+      email,
+    }).select("+password");
 
     if (!user) {
-      return res.status(400).json({ message: "Invalid email" });
+      return res.status(400).json({
+        message: "Invalid email",
+      });
     }
 
-    // 🔥 Google user without password
+    if (user.isBlocked) {
+      return res.status(403).json({
+        message: "Your account has been blocked",
+      });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({
+        message: "Your account is inactive",
+      });
+    }
+
+    // Google account without password
     if (!user.password) {
       return res.status(400).json({
         message: "This account uses Google login. Please continue with Google.",
@@ -86,8 +114,11 @@ export const login = async (req, res) => {
     const match = await bcrypt.compare(password, user.password);
 
     if (!match) {
-      return res.status(400).json({ message: "Invalid password" });
+      return res.status(400).json({
+        message: "Invalid password",
+      });
     }
+
     user.lastLogin = new Date();
 
     user.lastLoginIP =
@@ -96,9 +127,13 @@ export const login = async (req, res) => {
     user.lastDevice = req.headers["user-agent"];
 
     await user.save();
+
     res.json({
+      success: true,
+
       user: {
         _id: user._id,
+
         name: user.name,
         email: user.email,
 
@@ -106,6 +141,7 @@ export const login = async (req, res) => {
         avatarKey: user.avatarKey,
 
         role: user.role,
+        isBlocked: user.isBlocked,
 
         subscription: user.subscription,
         subscriptionStatus: user.subscriptionStatus,
@@ -129,7 +165,10 @@ export const login = async (req, res) => {
     });
   } catch (error) {
     console.error("Login Error:", error);
-    res.status(500).json({ message: "Server error" });
+
+    res.status(500).json({
+      message: "Server error",
+    });
   }
 };
 

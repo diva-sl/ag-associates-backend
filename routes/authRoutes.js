@@ -7,6 +7,7 @@ import {
   changePassword,
   forgotPassword,
   resetPassword,
+  getProfile,
 } from "../controllers/authController.js";
 
 import { protect } from "../middleware/authMiddleware.js";
@@ -36,9 +37,7 @@ router.post("/login", login);
 
 /* PROFILE */
 
-router.get("/profile", protect, (req, res) => {
-  res.json(req.user);
-});
+router.get("/profile", protect, getProfile);
 
 router.put("/profile", protect, updateProfile);
 
@@ -59,17 +58,22 @@ router.get(
   }),
   (req, res) => {
     const { token, user } = req.user;
+
+    // 🔥 BLOCKED USER CHECK
+    if (user.isBlocked) {
+      return res.redirect(`${process.env.FRONTEND_URL}/auth?error=blocked`);
+    }
+
     const redirect = req.query.state || "";
 
+    const encodedUser = encodeURIComponent(JSON.stringify(user));
+
     res.redirect(
-      `${process.env.FRONTEND_URL}/google-success?token=${token}&name=${encodeURIComponent(
-        user.name,
-      )}&email=${encodeURIComponent(user.email)}&avatar=${encodeURIComponent(
-        user.avatar || "",
-      )}&redirect=${redirect}`,
+      `${process.env.FRONTEND_URL}/google-success?token=${token}&user=${encodedUser}&redirect=${redirect}`,
     );
   },
 );
+
 router.put("/avatar", protect, uploadAvatar, async (req, res) => {
   try {
     if (!req.file) {
