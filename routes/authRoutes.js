@@ -54,29 +54,22 @@ router.get(
   "/google/callback",
   passport.authenticate("google", {
     session: false,
-    failureRedirect:
-      process.env.NODE_ENV === "production"
-        ? "https://agandassociates.org/auth"
-        : "http://localhost:5173/auth",
+    failureRedirect: `${process.env.FRONTEND_URL}/auth`,
   }),
   (req, res) => {
     const { token, user } = req.user;
 
-    const frontendUrl =
-      process.env.NODE_ENV === "production"
-        ? "https://agandassociates.org"
-        : "http://localhost:5173";
-
+    // 🔥 BLOCKED USER CHECK
     if (user.isBlocked) {
-      return res.redirect(`${frontendUrl}/auth?error=blocked`);
+      return res.redirect(`${process.env.FRONTEND_URL}/auth?error=blocked`);
     }
 
     const redirect = req.query.state || "";
 
     const encodedUser = encodeURIComponent(JSON.stringify(user));
 
-    return res.redirect(
-      `${frontendUrl}/google-success?token=${token}&user=${encodedUser}&redirect=${redirect}`,
+    res.redirect(
+      `${process.env.FRONTEND_URL}/google-success?token=${token}&user=${encodedUser}&redirect=${redirect}`,
     );
   },
 );
