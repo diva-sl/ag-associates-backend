@@ -10,7 +10,16 @@ const documentSchema = new mongoose.Schema(
 
     type: {
       type: String,
-      enum: ["PAN_CARD", "AADHAAR_CARD", "GST_CERTIFICATE", "ITR", "OTHER"],
+      enum: [
+        "PAN_CARD",
+        "AADHAAR_CARD",
+        "GST_CERTIFICATE",
+        "ITR",
+        "BANK_STATEMENT",
+        "FORM-16",
+        "OTHER",
+      ],
+
       required: true,
     },
 
