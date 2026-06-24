@@ -52,9 +52,12 @@ router.get("/google", (req, res, next) => {
 
 router.get(
   "/google/callback",
-  passport.authenticate({
+  passport.authenticate("google", {
     session: false,
-    failureRedirect: "/auth",
+    failureRedirect:
+      process.env.NODE_ENV === "production"
+        ? "https://agandassociates.org/auth"
+        : "http://localhost:5173/auth",
   }),
   (req, res) => {
     const { token, user } = req.user;
@@ -72,7 +75,7 @@ router.get(
 
     const encodedUser = encodeURIComponent(JSON.stringify(user));
 
-    res.redirect(
+    return res.redirect(
       `${frontendUrl}/google-success?token=${token}&user=${encodedUser}&redirect=${redirect}`,
     );
   },
